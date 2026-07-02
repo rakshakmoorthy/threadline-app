@@ -8,13 +8,11 @@
 
 Threadline is a web application that helps product managers at adaptive fashion brands discover what to build next — grounded in real consumer signals from Reddit and Amazon.
 
-A brand PM opens Threadline, selects a condition (post-mastectomy, ostomy, rheumatoid arthritis, or post-surgical recovery), and immediately sees:
+A brand PM opens Threadline, selects a condition (post-mastectomy, ostomy, rheumatoid arthritis, or post-surgical recovery), and immediately sees pre-generated ranked product opportunities. Everything loads instantly — no waiting, no forms, no pre-formed idea required.
 
-- The **top ranked product opportunities** for that condition — surfaced from real consumer posts and reviews
-- A **full product brief** for any opportunity — confirmed pain points, recommended materials, closures, sizing, and what to build first
+- The **top ranked product opportunities** for that condition — grounded in real consumer posts and reviews
+- A **full product brief** for any opportunity — confirmed pain points, recommended features, what to build first
 - **Cross-condition overlap** — when the same unmet need appears across multiple conditions, Threadline flags it automatically
-
-No focus groups. No guessing. No pre-formed idea required.
 
 ---
 
@@ -39,24 +37,30 @@ No focus groups. No guessing. No pre-formed idea required.
 
 ## How it works
 
-```
-Reddit + Amazon
-      ↓
-Python scraper (runs weekly via GitHub Actions)
-      ↓
-Supabase — PostgreSQL + pgvector
-      ↓
-FastAPI backend (hybrid search + Claude API)
-      ↓
-React frontend (ranked opportunities → full product brief)
+```mermaid
+flowchart TD
+    A[Reddit RSS - hot posts] --> C[Weekly Batch Job\nGitHub Actions]
+    B[Amazon - Bright Data API] --> C
+    C --> D[Clean Pipeline\nRemove noise and HTML]
+    D --> E[Extract Pipeline\nClaude Haiku\npain points + features]
+    E --> F[Embed Pipeline\nOpenAI text-embedding-3-small\nvectors]
+    F --> G[(Supabase\nPostgreSQL + pgvector\nconsumer_signals)]
+    G --> H[Synthesise Pipeline\nClaude Opus 4.8 - weekly\nrank top opportunities]
+    H --> I[(Supabase\nopportunities table\npre-generated briefs)]
+    I --> J[FastAPI Backend\nRender]
+    J --> K[React Frontend\nRender static]
+    K --> L[User selects condition]
+    L --> M[Ranked cards load instantly]
+    M --> N[User clicks card]
+    N --> O[Full brief loads instantly]
 ```
 
-1. A weekly scraper pulls posts and reviews from Reddit and Amazon
-2. Claude extracts pain points and product features from each record
-3. OpenAI embeddings convert each record into a vector for semantic search
-4. When a user selects a condition, the backend retrieves the most signal-rich opportunities
-5. Claude synthesizes the signals into ranked product ideas and detailed briefs
-6. The frontend displays everything — ranked list first, full brief on click
+1. A weekly scraper pulls hot posts from Reddit and reviews from Amazon via Bright Data
+2. A cleaning pipeline removes HTML, noise, and salutations from each record
+3. Claude Haiku extracts pain points and product features from each cleaned record
+4. OpenAI embeddings convert each record into a vector for semantic search
+5. Claude Opus 4.8 synthesises all signals weekly into ranked product opportunities and full briefs
+6. Everything is stored in Supabase — users see instant results, no on-demand LLM calls
 
 ---
 
@@ -65,13 +69,15 @@ React frontend (ranked opportunities → full product brief)
 | Layer | Tool |
 |---|---|
 | Database | Supabase (PostgreSQL + pgvector) |
-| Backend | FastAPI (Python) |
-| Frontend | React + Vite |
-| Scraping | PRAW (Reddit), httpx + BeautifulSoup (Amazon) |
-| AI — intelligence | Claude API (`claude-sonnet-4-6`) |
+| Backend | FastAPI (Python) on Render |
+| Frontend | React + Vite on Render |
+| Scraping — Reddit | RSS feed (hot posts, no API key needed) |
+| Scraping — Amazon | Bright Data API |
+| AI — extraction | Claude Haiku (`claude-haiku-4-5-20251001`) |
+| AI — synthesis | Claude Opus 4.8 (`claude-opus-4-8`) |
 | AI — embeddings | OpenAI `text-embedding-3-small` |
-| Hosting | Render (backend + static frontend) |
-| Automation | GitHub Actions (weekly scraper + Supabase keepalive) |
+| AI — chatbot (Phase 2) | Claude Sonnet 4.6 |
+| Automation | GitHub Actions (weekly pipeline + Supabase keepalive) |
 
 ---
 
@@ -100,47 +106,19 @@ threadline-app/
 │   │   └── github_actions.md
 │   └── decisions_log.md
 ├── scraper/
+│   ├── reddit_scraper.py
+│   ├── huggingface_loader.py
+│   ├── cleaner.py
+│   ├── extractor.py
+│   ├── embedder.py
+│   ├── synthesiser.py
+│   └── pipeline.py
 ├── backend/
 ├── frontend/
 └── .github/
     └── workflows/
-        ├── scraper.yml
+        ├── pipeline.yml
         └── keepalive.yml
-```
-
----
-
-## Getting started
-
-See [`docs/build/local_setup.md`](docs/build/local_setup.md) for full local setup instructions.
-
-Quick version:
-
-```bash
-git clone https://github.com/rakshakmoorthy/threadline-app.git
-cd threadline-app
-
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
-
-# Frontend
-cd ../frontend
-npm install
-npm run dev
-```
-
-You will need the following environment variables — see `docs/build/local_setup.md` for details:
-
-```
-SUPABASE_URL=
-SUPABASE_KEY=
-CLAUDE_API_KEY=
-OPENAI_API_KEY=
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-REDDIT_USER_AGENT=
 ```
 
 ---
@@ -149,30 +127,22 @@ REDDIT_USER_AGENT=
 
 | Document | What it covers |
 |---|---|
-| [`product_vision.md`](docs/product/product_vision.md) | What Threadline is, who it's for, and why it exists |
-| [`user_flow.md`](docs/product/user_flow.md) | Full user experience from landing to output |
-| [`feature_spec.md`](docs/product/feature_spec.md) | Every feature defined precisely |
-| [`architecture_spec.md`](docs/architecture/architecture_spec.md) | System architecture and all technical decisions |
-| [`data_schema.md`](docs/architecture/data_schema.md) | Full database schema |
-| [`api_reference.md`](docs/architecture/api_reference.md) | Every API endpoint |
-| [`prompt_library.md`](docs/data/prompt_library.md) | Every Claude prompt used in the system |
-| [`data_sources.md`](docs/data/data_sources.md) | Every data source and why it was chosen |
-| [`data_pipeline.md`](docs/data/data_pipeline.md) | How the scraper and pipeline work end to end |
-| [`local_setup.md`](docs/build/local_setup.md) | How to run Threadline locally |
-| [`deployment.md`](docs/build/deployment.md) | How to deploy to Render |
-| [`github_actions.md`](docs/build/github_actions.md) | Scraper and keepalive workflow configuration |
-| [`decisions_log.md`](docs/decisions_log.md) | Every major decision and its rationale |
+| [product_vision.md](docs/product/product_vision.md) | What Threadline is, who it's for, and why it exists |
+| [user_flow.md](docs/product/user_flow.md) | Full user experience from landing to output |
+| [feature_spec.md](docs/product/feature_spec.md) | Every feature defined precisely |
+| [architecture_spec.md](docs/architecture/architecture_spec.md) | System architecture and all technical decisions |
+| [data_schema.md](docs/architecture/data_schema.md) | Full database schema |
 
 ---
 
 ## Status
 
-Currently in active development. Data pipeline → backend → frontend, in that order.
+Active development. Data pipeline complete → backend → frontend in progress.
 
 ---
 
 ## Author
 
-Raksha Krishna Moorthy  
-MS Information Systems, Northeastern University  
-[github.com/rakshakmoorthy](https://github.com/rakshakmoorthy)
+Raksha Krishna Moorthy
+MS Information Systems, Northeastern University
+github.com/rakshakmoorthy
