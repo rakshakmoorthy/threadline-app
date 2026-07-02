@@ -15,6 +15,7 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+# Target subreddits mapped to conditions
 SUBREDDITS = {
     "post_mastectomy": ["breastcancer", "mastectomy", "BRCA"],
     "ostomy": ["ostomy", "CrohnsDisease", "UlcerativeColitis"],
@@ -22,6 +23,7 @@ SUBREDDITS = {
     "post_surgical": ["PostOpRecovery", "plasticsurgery"],
 }
 
+# Relevance keywords
 KEYWORDS = [
     "clothes", "clothing", "wear", "wearing", "dress", "dressing",
     "bra", "shirt", "pants", "underwear", "garment", "outfit",
@@ -50,7 +52,8 @@ def strip_html(text):
     return clean
 
 
-def fetch_subreddit_rss(subreddit, sort="new"):
+def fetch_subreddit_rss(subreddit, sort="hot"):
+    """Fetch posts from a subreddit using RSS feed."""
     url = f"https://www.reddit.com/r/{subreddit}/{sort}/.rss"
     try:
         response = httpx.get(url, headers=HEADERS, timeout=15, follow_redirects=True)
@@ -88,7 +91,8 @@ def fetch_subreddit_rss(subreddit, sort="new"):
         return []
 
 
-def process_posts(posts, condition, subreddit):
+def process_posts(posts, condition):
+    """Filter and format posts for Supabase."""
     records = []
     for post in posts:
         full_text = f"{post['title']}. {post['text']}".strip()
@@ -113,6 +117,7 @@ def process_posts(posts, condition, subreddit):
 
 
 def save_to_supabase(records):
+    """Save records to Supabase, skipping duplicates."""
     saved = 0
     skipped = 0
     for record in records:
@@ -127,7 +132,8 @@ def save_to_supabase(records):
 
 
 def run():
-    print("Starting Reddit scraper (RSS)...")
+    """Run the full Reddit scraping pipeline."""
+    print("Starting Reddit scraper (hot posts only)...")
     total_saved = 0
 
     for condition, subreddits in SUBREDDITS.items():
@@ -135,16 +141,21 @@ def run():
         for subreddit in subreddits:
             print(f"  Scraping r/{subreddit}...")
             all_posts = []
-            for sort in ["new", "hot", "top"]:
+
+            # Hot first (highest signal), then new (freshness)
+            for sort in ["hot", "new"]:
                 posts = fetch_subreddit_rss(subreddit, sort)
                 all_posts.extend(posts)
                 time.sleep(random.uniform(2, 4))
-            records = process_posts(all_posts, condition, subreddit)
+
+            records = process_posts(all_posts, condition)
             print(f"  Found {len(records)} relevant posts")
+
             if records:
                 saved, skipped = save_to_supabase(records)
                 total_saved += saved
-                print(f"  Saved: {saved} | Skipped: {skipped}")
+                print(f"  Saved: {saved} | Skipped duplicates: {skipped}")
+
             time.sleep(random.uniform(3, 6))
 
     print(f"\nDone. Total Reddit records saved: {total_saved}")
