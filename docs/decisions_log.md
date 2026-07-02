@@ -129,6 +129,3 @@ And then Phase 2: Talk with Reports. The ability to ask Threadline a question an
 *Threadline was built by Raksha Krishna Moorthy, MS Information Systems, Northeastern University.*
 *GitHub: github.com/rakshakmoorthy/threadline-app*
 
----
-
-*Visual version of this document: [threadline_evolution.html](threadline_evolution.html)*
