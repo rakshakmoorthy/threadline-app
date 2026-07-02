@@ -1,5 +1,6 @@
 import anthropic
 import json
+import re
 from supabase import create_client
 from dotenv import load_dotenv
 import os
@@ -25,48 +26,39 @@ CONDITION_LABELS = {
 
 SYNTHESIS_PROMPT = """You are a product intelligence analyst specializing in adaptive fashion.
 
-You have been given a collection of real consumer posts and reviews from people living with {condition_label}. Each record contains extracted pain points and product features that consumers mentioned.
+You have been given consumer posts and reviews from people living with {condition_label}. Each record contains extracted pain points and product features.
 
-Your task is to synthesize these signals into the top 10 ranked product opportunities for adaptive fashion brands.
+Synthesize these into the top 5 ranked product opportunities for adaptive fashion brands.
 
-For each opportunity, provide:
-1. A specific, actionable product idea title (e.g. "Front-closure adaptive bra with drain pocket")
-2. A signal strength score (0-100) based on how many records support this opportunity and how strongly
-3. A confidence level: "high" (60+ supporting signals), "medium" (20-59), or "low" (under 20)
-4. A one-line pain point summary
-5. A full product brief with:
-   - confirmed_pain_points: list of specific pain points this addresses
-   - recommended_features: list of specific features consumers want
-   - priority_features: top 3 features to build first
-   - gaps: what the data doesn't tell us yet
-6. Sample evidence: 3 short excerpts from real consumer posts that support this opportunity
+Return ONLY a valid JSON array. Keep each field concise to fit within token limits.
 
-Return ONLY a valid JSON array with exactly this structure, no other text:
 [
   {{
-    "title": "Product idea title",
+    "title": "Specific product idea (max 10 words)",
     "score": 85,
     "confidence": "high",
-    "pain_point_summary": "One line summary of main pain point",
+    "pain_point_summary": "One line summary (max 20 words)",
     "brief": {{
-      "confirmed_pain_points": ["pain point 1", "pain point 2"],
-      "recommended_features": ["feature 1", "feature 2"],
+      "confirmed_pain_points": ["pain point 1", "pain point 2", "pain point 3"],
+      "recommended_features": ["feature 1", "feature 2", "feature 3"],
       "priority_features": ["priority 1", "priority 2", "priority 3"],
       "gaps": ["gap 1"]
     }},
     "evidence": [
-      {{"source": "reddit", "excerpt": "short quote from consumer post"}},
-      {{"source": "amazon", "excerpt": "short quote from review"}}
+      {{"source": "reddit", "excerpt": "Short quote (max 20 words)"}},
+      {{"source": "amazon", "excerpt": "Short quote (max 20 words)"}}
     ]
   }}
 ]
+
+Scoring: high=60+ signals, medium=20-59, low=under 20.
 
 Consumer signals for {condition_label}:
 {signals}
 """
 
 
-def fetch_signals(condition: str, limit: int = 200) -> list:
+def fetch_signals(condition: str, limit: int = 100) -> list:
     """Fetch extracted signals for a condition."""
     result = supabase.table("consumer_signals")\
         .select("id, source, raw_text, pain_points, mentioned_features, sentiment, upvotes")\
@@ -79,19 +71,44 @@ def fetch_signals(condition: str, limit: int = 200) -> list:
 
 
 def format_signals(signals: list) -> str:
-    """Format signals for the prompt."""
+    """Format signals for the prompt — keep concise."""
     formatted = []
-    for i, s in enumerate(signals[:150]):
+    for i, s in enumerate(signals[:80]):
         pain = s.get("pain_points") or []
         features = s.get("mentioned_features") or []
-        text = s.get("raw_text", "")[:300]
         formatted.append(
-            f"Record {i+1} ({s.get('source', '')}, upvotes: {s.get('upvotes', 0)}):\n"
-            f"Text: {text}\n"
-            f"Pain points: {', '.join(pain) if pain else 'none'}\n"
-            f"Features mentioned: {', '.join(features) if features else 'none'}\n"
+            f"[{i+1}] {s.get('source','')} | "
+            f"Pain: {'; '.join(pain[:2]) if pain else 'none'} | "
+            f"Features: {'; '.join(features[:2]) if features else 'none'}"
         )
-    return "\n---\n".join(formatted)
+    return "\n".join(formatted)
+
+
+def extract_json(text: str) -> list:
+    """Extract JSON array from response text robustly."""
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except:
+        pass
+
+    # Try extracting from markdown code block
+    try:
+        match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', text, re.DOTALL)
+        if match:
+            return json.loads(match.group(1))
+    except:
+        pass
+
+    # Try finding JSON array directly
+    try:
+        match = re.search(r'\[.*\]', text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+    except:
+        pass
+
+    return []
 
 
 def synthesise_condition(condition: str) -> list:
@@ -100,8 +117,8 @@ def synthesise_condition(condition: str) -> list:
     signals = fetch_signals(condition)
     print(f"  Found {len(signals)} signals")
 
-    if len(signals) < 10:
-        print(f"  Not enough signals for {condition} — skipping")
+    if len(signals) < 5:
+        print(f"  Not enough signals — skipping")
         return []
 
     formatted = format_signals(signals)
@@ -117,19 +134,18 @@ def synthesise_condition(condition: str) -> list:
     try:
         message = client.messages.create(
             model="claude-opus-4-8",
-            max_tokens=4000,
+            max_tokens=8000,
             messages=[{"role": "user", "content": prompt}]
         )
 
         response_text = message.content[0].text.strip()
+        opportunities = extract_json(response_text)
 
-        # Clean JSON if wrapped in markdown
-        if "```" in response_text:
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
+        if not opportunities:
+            print(f"  Could not parse JSON response")
+            print(f"  Response preview: {response_text[:200]}")
+            return []
 
-        opportunities = json.loads(response_text)
         print(f"  Generated {len(opportunities)} opportunities")
         return opportunities
 
@@ -156,14 +172,14 @@ def save_opportunities(opportunities: list, condition: str):
                 "score": opp.get("score", 0),
                 "confidence": opp.get("confidence", "low"),
                 "pain_point_summary": opp.get("pain_point_summary", ""),
-                "brief": opp.get("brief", {}),
+                "brief": {
+                    **opp.get("brief", {}),
+                    "evidence": opp.get("evidence", [])
+                },
                 "signal_ids": [],
                 "overlap": False,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             }
-
-            # Add evidence to brief
-            record["brief"]["evidence"] = opp.get("evidence", [])
 
             supabase.table("opportunities").insert(record).execute()
             saved += 1
@@ -182,37 +198,25 @@ def detect_overlap():
         .execute()
 
     all_opps = result.data
-
-    # Find similar titles across conditions
-    from collections import defaultdict
-    title_map = defaultdict(list)
-
-    for opp in all_opps:
-        # Normalize title for comparison
-        key_words = set(opp["title"].lower().split())
-        for existing_key, existing_opps in title_map.items():
-            existing_words = set(existing_key.split())
-            overlap = len(key_words & existing_words) / max(len(key_words), len(existing_words))
-            if overlap > 0.5:
-                existing_opps.append(opp)
-                break
-        else:
-            title_map[" ".join(sorted(key_words))].append(opp)
-
-    # Flag overlapping opportunities
     flagged = 0
-    for key, opps in title_map.items():
-        if len(opps) > 1:
-            conditions = list(set(o["condition"] for o in opps))
-            if len(conditions) > 1:
-                for opp in opps:
+
+    for i, opp1 in enumerate(all_opps):
+        for opp2 in all_opps[i+1:]:
+            if opp1["condition"] == opp2["condition"]:
+                continue
+            words1 = set(opp1["title"].lower().split())
+            words2 = set(opp2["title"].lower().split())
+            overlap = len(words1 & words2) / max(len(words1), len(words2))
+            if overlap > 0.4:
+                conditions = list(set([opp1["condition"], opp2["condition"]]))
+                for opp_id in [opp1["id"], opp2["id"]]:
                     supabase.table("opportunities")\
                         .update({"overlap": True, "conditions": conditions})\
-                        .eq("id", opp["id"])\
+                        .eq("id", opp_id)\
                         .execute()
-                    flagged += 1
+                flagged += 1
 
-    print(f"  Flagged {flagged} opportunities as cross-condition overlap")
+    print(f"  Flagged {flagged} opportunity pairs as cross-condition overlap")
 
 
 def run():
