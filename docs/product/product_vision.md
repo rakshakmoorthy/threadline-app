@@ -20,7 +20,7 @@ Threadline replaces that process with something faster, cheaper, and grounded in
 
 ## The Solution
 
-Threadline is a web application that continuously collects consumer posts and reviews from Reddit and Amazon, extracts pain points and product feature signals using AI, and surfaces them as ranked product opportunities and detailed product briefs — on demand, for any of the four conditions it covers at launch.
+Threadline is a web application that continuously collects consumer posts and reviews from Reddit and Amazon, extracts pain points and product feature signals using AI, and surfaces them as pre-generated ranked product opportunities and detailed product briefs — available instantly, for any of the four conditions it covers at launch.
 
 A product manager opens Threadline, selects a condition, and sees:
 
@@ -53,6 +53,7 @@ There is no other product intelligence tool built specifically for adaptive fash
 - Surface cross-condition overlap as a signal (a feature need shared across three conditions is a larger market opportunity than one shared by one)
 - Go from raw consumer language to a specific, actionable product brief automatically
 - Update continuously from live data rather than from a one-time study
+- Allow PMs to talk with the data — asking questions and getting answers grounded in real consumer signals (Phase 2)
 
 Threadline is not a report. It is not a dashboard of generic trends. It is a tool that tells a brand PM exactly what to build, for whom, and why — backed by the words of real consumers.
 

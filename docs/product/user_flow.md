@@ -1,7 +1,6 @@
 # Threadline — User Flow
 
 **Version:** 2.0  
-**Status:** Approved for build  
 **Last updated:** July 2, 2026  
 
 ---

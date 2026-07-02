@@ -1,7 +1,6 @@
 # Threadline — Technical Architecture Specification
 
 **Version:** 3.0 (rebuilt from friend's architectural recommendations)
-**Status:** Approved for build  
 **Last updated:** July 2, 2026  
 **Author:** Raksha Krishna Moorthy  
 
