@@ -1,8 +1,8 @@
 # Threadline — Technical Architecture Specification
 
-**Version:** 2.0 (full rewrite)  
+**Version:** 3.0 (rebuilt from friend's architectural recommendations)
 **Status:** Approved for build  
-**Last updated:** July 1, 2026  
+**Last updated:** July 2, 2026  
 **Author:** Raksha Krishna Moorthy  
 
 ---
@@ -11,9 +11,7 @@
 
 Threadline is an AI-powered market intelligence web application for the adaptive fashion market.
 
-A user selects one or more conditions and immediately sees ranked product opportunities grounded in real consumer signals from Reddit and Amazon. They click any opportunity to get a full product brief — confirmed pain points, recommended features, priority order, gaps, and source evidence.
-
-No pre-formed idea required. No focus group. No waiting.
+A brand PM selects one or more conditions and instantly sees pre-generated ranked product opportunities grounded in real consumer signals from Reddit and Amazon. They click any opportunity to get a full product brief — confirmed pain points, recommended features, priority order, gaps, and source evidence. Everything loads instantly — no waiting, no on-demand LLM calls.
 
 **Target conditions at launch:**
 - Post-mastectomy / breast cancer recovery
@@ -25,141 +23,163 @@ No pre-formed idea required. No focus group. No waiting.
 
 ---
 
-## 2. System Architecture Overview
+## 2. Core Architecture Principle
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      DATA LAYER                         │
-│                                                         │
-│  Reddit API (PRAW)     Amazon (HTTP scraper)            │
-│       ↓                        ↓                        │
-│       └────────────────────────┘                        │
-│                     ↓                                   │
-│           Python scraper pipeline                       │
-│           (extraction + embedding)                      │
-│                     ↓                                   │
-│        GitHub Actions (weekly cron)                     │
-│                     ↓                                   │
-│         Supabase — PostgreSQL + pgvector                │
-└─────────────────────────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────────────┐
-│                   BACKEND LAYER                         │
-│                                                         │
-│             FastAPI (Python) on Render                  │
-│                                                         │
-│  • Receives condition selection from frontend           │
-│  • Queries Supabase for relevant consumer signals       │
-│  • Calls Claude API to generate opportunities + briefs  │
-│  • Returns ranked opportunities + full briefs           │
-│  • Claude API key lives here and only here              │
-└─────────────────────────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────────────┐
-│                  FRONTEND LAYER                         │
-│                                                         │
-│        React (Vite) — Render static site                │
-│                                                         │
-│  • Brief explanation + condition selector               │
-│  • Multi-condition selection                            │
-│  • Ranked opportunity cards                             │
-│  • Cross-condition overlap flagging                     │
-│  • Full product brief                                   │
-│  • Navigation between brief and ranked list             │
-└─────────────────────────────────────────────────────────┘
+> Use the right model for the right task.
+
+Heavy models (Claude Opus) run once a week in a batch job and pre-generate all opportunities. Users never trigger expensive model calls — they read from a database. This makes the product fast, cheap, and scalable.
+
+---
+
+## 3. System Architecture Overview
+
+```mermaid
+flowchart TD
+    A[Reddit RSS - hot posts] --> C[Weekly Batch Job\nGitHub Actions]
+    B[Amazon - Bright Data] --> C
+    C --> D[Clean Pipeline\nRemove noise HTML salutations]
+    D --> E[Extract Pipeline\nClaude Haiku\npain points + features]
+    E --> F[Embed Pipeline\ntext-embedding-3-small\nvectors]
+    F --> G[(Supabase\nPostgreSQL + pgvector\nconsumer_signals)]
+    G --> H[Synthesise Pipeline\nClaude Opus - weekly\nrank top 10 opportunities]
+    H --> I[(Supabase\nopportunities table\npre-generated briefs)]
+    I --> J[FastAPI Backend\nRender]
+    J --> K[React Frontend\nRender static]
+    K --> L[User selects condition]
+    L --> M[Ranked cards load instantly]
+    M --> N[User clicks card]
+    N --> O[Full brief loads instantly]
 ```
 
 ---
 
-## 3. Architecture Decisions (with justification)
+## 4. Pipeline Design
 
-### 3.1 Why a Backend (FastAPI)?
+### Stage 1 — Scrape
 
-**Decision:** Build a FastAPI backend rather than calling Claude API directly from React.
+| Source | Method | What we collect | Frequency |
+|---|---|---|---|
+| Reddit | RSS feed (hot posts only) | Post title + body from target subreddits | Weekly |
+| Amazon | Bright Data API | Review text, rating, verified purchase status | Weekly |
 
-**Reason:** Calling the Claude API from a React frontend exposes the API key to anyone who opens browser dev tools. For a product being shown to industry contacts and potential employers, this is a real security problem. FastAPI protects the key and gives a clean API contract between frontend and backend.
+**Reddit — hot posts only.**
+Hot posts have the most upvotes and comments — highest signal quality. New posts are too noisy. Top posts are too old.
 
-**Tradeoff:** More to build and host — worth it.
+**Target subreddits:**
 
-### 3.2 Search Strategy — Hybrid (Condition Filter + Semantic Search)
+| Condition | Subreddits |
+|---|---|
+| Post-mastectomy | r/breastcancer, r/mastectomy, r/BRCA |
+| Ostomy | r/ostomy, r/CrohnsDisease, r/UlcerativeColitis |
+| Rheumatoid | r/rheumatoid, r/ChronicPain, r/arthritis |
+| Post-surgical | r/PostOpRecovery, r/plasticsurgery |
 
-**Decision:** Filter by condition first, then run semantic/vector search within that subset.
-
-**Reason:**
-- Pure keyword search misses meaning — "difficulty dressing post-surgery" and "can't get clothes on after operation" describe the same need but share no keywords
-- Pure semantic search across all records is slower and noisier without filtering
-- Hybrid gives the best results: condition narrows the pool, vector search finds the most relevant signals within it
-
-**Implementation:** pgvector is included in all Supabase plans including free, at no extra cost. Each consumer record gets an embedding at ingestion. At query time, the condition filters the records and vector similarity finds the most relevant ones within that subset.
-
-### 3.3 Opportunity Generation — Open Question
-
-**Decision:** Not yet decided whether ranked opportunities are generated on demand by Claude when a user selects a condition, or pre-generated during the scrape pipeline and stored in the database.
-
-**Tradeoffs:**
-
-| Approach | Pros | Cons |
-|---|---|---|
-| On demand (Claude at query time) | Always reflects latest data; no pre-generation needed | Slower response; higher Claude API cost per request |
-| Pre-generated (Claude at scrape time) | Fast response for user; lower real-time cost | Stale until next scrape; more complex pipeline |
-
-**Decision needed by:** Backend build — Step 3.2.
-
-### 3.4 Data Freshness — Weekly Scrape
-
-**Decision:** Weekly automated scrape via GitHub Actions cron job.
-
-**Reason:**
-- Adaptive fashion consumer conversations do not change daily — weekly is fresh enough
-- Daily scraping risks Reddit rate limits and potential bans
-- GitHub Actions is completely free for public repositories
-
-**Critical constraint:** GitHub Actions automatically disables scheduled workflows after 60 days of repository inactivity. Mitigation: ensure at least one repo commit every 60 days, and always include `workflow_dispatch` so the pipeline can be triggered manually.
-
-### 3.5 API Key Security
-
-**Decision:** Claude API key lives in the FastAPI backend only, stored as an environment variable in Render's dashboard.
-
-**Never in:**
-- Frontend code
-- GitHub repository
-- `.env` files committed to git
-
-`.gitignore` excludes `.env` from day one.
-
-### 3.6 Supabase Inactivity Pause — Verified Mitigation
-
-**Risk:** Free tier projects pause after exactly 7 days of zero database activity. The timer tracks actual database queries — not API calls, not dashboard visits.
-
-**Correct mitigation:** A GitHub Actions workflow runs every 5 days and inserts a row into a dedicated `keepalive` table. This resets the inactivity timer. Rows older than 7 days are deleted on each run to keep the table small.
-
-**Important:** Pinging a health endpoint does NOT reset the timer. Only actual database activity does.
-
-### 3.7 Render Cold Start — Verified Behavior
-
-**Risk:** FastAPI backend on Render free tier spins down after 15 minutes of inactivity. Cold start takes approximately 1 minute — unacceptable for a live demo.
-
-**Mitigation:**
-- During development: accept cold starts
-- Before any demo: either upgrade to Render Starter ($7/mo) or add a keep-alive ping every 10 minutes via GitHub Actions or a free Uptime Robot monitor
-
-**Frontend (static site) is not affected** — Render static sites have no spin-down and are free permanently.
-
-### 3.8 Embedding Model — Open Question
-
-**Decision:** Not yet decided. OpenAI `text-embedding-3-small` is the working assumption but has not been confirmed.
-
-**Decision needed by:** Step 2.3 (embedding pipeline build).
-
-### 3.9 One Repository
-
-**Decision:** One repository (`threadline-app`) for everything — scraper, backend, frontend, docs, and GitHub Actions workflows.
-
-**Reason:** Simpler to manage, easier to deploy, appropriate for this project size. Separate repos add complexity with no real benefit at this stage.
+**Amazon — Bright Data API (free tier: 5,000 records/month)**
+Sends ASINs, gets structured review JSON back. Handles proxies and CAPTCHAs automatically.
 
 ---
 
-## 4. Database Schema
+### Stage 2 — Clean
+
+Before any LLM touches the data, clean it. Dirty input = poor extraction = wasted tokens.
+
+**What gets removed:**
+- HTML tags and markdown formatting
+- Salutations ("Hi everyone", "Thanks so much", "Hope you're well")
+- Deleted or removed post content ("[deleted]", "[removed]")
+- Posts under 20 words
+- Off-topic content (no clothing or adaptive fashion keywords)
+
+**Output:** `clean_text` stored in `consumer_signals` table alongside `raw_text`.
+
+---
+
+### Stage 3 — Extract (Claude Haiku)
+
+Claude Haiku reads each `clean_text` and extracts structured data.
+
+**Why Haiku:** Cheap, fast, runs on every record. Good enough for structured extraction from short consumer text.
+
+**Model:** `claude-haiku-4-5-20251001` — $1.00 input / $5.00 output per million tokens. Use Batch API for 50% discount since extraction is not time-sensitive.
+
+**Input:** `clean_text`
+
+**Output:**
+```json
+{
+  "pain_points": [
+    "Cannot fasten back closures with limited arm mobility",
+    "Standard bras cause discomfort against surgical drain sites"
+  ],
+  "mentioned_features": [
+    "front closure",
+    "magnetic buttons",
+    "soft cotton",
+    "drain pocket"
+  ],
+  "sentiment": "negative"
+}
+```
+
+Stored back into `consumer_signals.pain_points`, `consumer_signals.mentioned_features`, `consumer_signals.sentiment`.
+
+---
+
+### Stage 4 — Embed
+
+**Model:** OpenAI `text-embedding-3-small` (working assumption — not yet confirmed)
+**Input:** `clean_text`
+**Output:** `VECTOR(1536)` stored in `consumer_signals.embedding`
+
+Embeddings enable semantic search — finding records by meaning, not just keywords. Used by the synthesis pipeline to cluster related signals.
+
+---
+
+### Stage 5 — Synthesise (Claude Opus — once a week)
+
+The most powerful and expensive step. Runs once a week — not on every user click.
+
+**Why Opus:** Best reasoning capability for synthesising hundreds of signals into ranked, nuanced product opportunities.
+
+**Model:** `claude-opus-4-8` — $5.00 input / $25.00 output per million tokens. Use Batch API (50% discount) since synthesis runs weekly, not in real time. Effective cost: $2.50/$12.50 per million tokens.
+
+**Input:**
+- All `consumer_signals` records for a condition, grouped by embedding clusters
+- Extracted pain points and features from each record
+
+**Output per condition:** Top 10 ranked product opportunities, each with:
+- Product idea title
+- Signal strength score (0–100)
+- Confidence level (High / Medium / Low)
+- Top pain point summary (one line)
+- Full product brief (pain points, features, priority, gaps)
+- Source evidence (sample Reddit posts and Amazon reviews)
+
+**Output stored in:** `opportunities` table in Supabase
+
+---
+
+## 5. User Experience (Instant Load)
+
+Once opportunities are pre-generated and stored, the user experience requires no LLM calls:
+
+```
+User selects condition(s)
+        ↓
+FastAPI queries opportunities table
+        ↓
+Ranked cards return instantly from DB
+        ↓
+User clicks a card
+        ↓
+Full brief returns instantly from DB
+```
+
+No waiting. No spinning. No 30-second LLM generation on click.
+
+---
+
+## 6. Database Schema
 
 ### Table: `consumer_signals`
 
@@ -168,16 +188,35 @@ No pre-formed idea required. No focus group. No waiting.
 | `id` | UUID (PK) | Unique record ID |
 | `source` | TEXT | `reddit` or `amazon` |
 | `source_url` | TEXT | Original post/review URL |
-| `source_id` | TEXT | Reddit post ID or ASIN + review ID (used for deduplication) |
-| `condition` | TEXT | `post_mastectomy`, `ostomy`, `rheumatoid`, `post_surgical` |
-| `raw_text` | TEXT | Original post/review text |
-| `pain_points` | JSONB | Extracted pain points array |
-| `mentioned_features` | JSONB | Product features mentioned in the text |
+| `source_id` | TEXT | Unique ID for deduplication |
+| `condition` | TEXT | One of the four launch conditions |
+| `raw_text` | TEXT | Original unmodified text |
+| `clean_text` | TEXT | Cleaned text — HTML removed, salutations removed |
+| `pain_points` | JSONB | Extracted pain points array (Haiku output) |
+| `mentioned_features` | JSONB | Product features mentioned |
 | `sentiment` | TEXT | `positive`, `negative`, `mixed` |
 | `upvotes` | INTEGER | Reddit upvotes or Amazon helpfulness votes |
-| `embedding` | VECTOR(1536) | Semantic embedding for vector search |
-| `scraped_at` | TIMESTAMP | When this record was collected |
+| `embedding` | VECTOR(1536) | Semantic embedding |
+| `scraped_at` | TIMESTAMP | When collected |
 | `created_at` | TIMESTAMP | DB insert time |
+
+### Table: `opportunities`
+
+Pre-generated weekly by Claude Opus. Read directly by the frontend via FastAPI.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID (PK) | Unique opportunity ID |
+| `condition` | TEXT | Primary condition |
+| `conditions` | TEXT[] | All conditions this applies to (for overlap) |
+| `title` | TEXT | Product idea title |
+| `score` | INTEGER | Signal strength score 0–100 |
+| `confidence` | TEXT | `high`, `medium`, `low` |
+| `pain_point_summary` | TEXT | One-line top pain point |
+| `brief` | JSONB | Full product brief |
+| `signal_ids` | UUID[] | Which consumer_signals drove this |
+| `overlap` | BOOLEAN | True if appears across multiple conditions |
+| `generated_at` | TIMESTAMP | When this was generated |
 
 ### Table: `keepalive`
 
@@ -186,46 +225,19 @@ No pre-formed idea required. No focus group. No waiting.
 | `id` | SERIAL (PK) | Auto-increment |
 | `pinged_at` | TIMESTAMP | When the ping ran |
 
-Rows older than 7 days are deleted on each ping run. Table stays small (~5 rows max).
-
-### Table: `opportunities` *(if pre-generation approach is chosen)*
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | UUID (PK) | Unique opportunity ID |
-| `condition` | TEXT | Primary condition |
-| `conditions` | TEXT[] | All conditions this opportunity applies to |
-| `title` | TEXT | Product idea title |
-| `score` | INTEGER | Signal strength score 0–100 |
-| `confidence` | TEXT | `high`, `medium`, `low` |
-| `pain_point_summary` | TEXT | One-line top pain point summary |
-| `brief` | JSONB | Full product brief |
-| `signal_ids` | UUID[] | Which consumer_signals drove this opportunity |
-| `generated_at` | TIMESTAMP | When this opportunity was generated |
-
-*Note: This table is only needed if opportunities are pre-generated. If generated on demand, this table is not required.*
-
-### Table: `validations` *(future — for when auth is added)*
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | UUID (PK) | Unique validation ID |
-| `opportunity_id` | UUID | Which opportunity was viewed |
-| `created_at` | TIMESTAMP | When this was saved |
-
 ---
 
-## 5. API Design (FastAPI)
+## 7. API Design (FastAPI)
 
-### `POST /opportunities`
+All data flows through FastAPI. Frontend never calls Supabase or Claude directly.
 
-Called when a user selects one or more conditions and requests ranked opportunities.
+### `GET /opportunities`
+
+Returns pre-generated ranked opportunities for selected conditions.
 
 **Request:**
-```json
-{
-  "conditions": ["post_mastectomy", "ostomy"]
-}
+```
+GET /opportunities?conditions=post_mastectomy,ostomy
 ```
 
 **Response:**
@@ -237,201 +249,95 @@ Called when a user selects one or more conditions and requests ranked opportunit
       "title": "Front-closure adaptive top",
       "score": 87,
       "confidence": "high",
-      "pain_point_summary": "Consumers cannot fasten standard closures post-surgery",
+      "pain_point_summary": "Cannot fasten standard closures post-surgery",
       "conditions": ["post_mastectomy", "post_surgical"],
       "overlap": true
-    },
-    {
-      "id": "uuid",
-      "title": "High-waist adaptive trousers",
-      "score": 74,
-      "confidence": "medium",
-      "pain_point_summary": "Standard waistbands are incompatible with ostomy pouches",
-      "conditions": ["ostomy"],
-      "overlap": false
     }
   ],
-  "total": 2,
-  "generated_at": "2026-07-01T12:00:00Z"
+  "total": 10,
+  "generated_at": "2026-07-02T02:00:00Z"
 }
 ```
 
-### `GET /opportunities/{id}/brief`
+### `GET /opportunities/{id}`
 
-Called when a user clicks an opportunity card to see the full brief.
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "title": "Front-closure adaptive top",
-  "score": 87,
-  "confidence": "high",
-  "conditions": ["post_mastectomy", "post_surgical"],
-  "overlap": true,
-  "pain_points": [
-    "Cannot fasten back closures with limited arm mobility",
-    "Standard bras cause discomfort against surgical sites"
-  ],
-  "recommended_features": [
-    "Front closure",
-    "Soft fabric with no seams near surgical sites"
-  ],
-  "priority_features": [
-    "Front closure mechanism",
-    "Drain pocket compatibility"
-  ],
-  "gaps": [
-    "Limited data on sizing preferences for asymmetric recovery"
-  ],
-  "evidence": [
-    {
-      "source": "reddit",
-      "url": "https://reddit.com/r/breastcancer/...",
-      "excerpt": "...",
-      "relevance_score": 0.91
-    }
-  ],
-  "signal_count": 34
-}
-```
-
-### `GET /health`
-Returns API status. Used by keep-alive ping and for debugging.
+Returns the full pre-generated product brief for a specific opportunity.
 
 ### `GET /conditions`
-Returns the list of supported conditions.
+
+Returns supported conditions and record counts.
+
+### `GET /health`
+
+Returns API status. Used by keep-alive ping.
+
+### `POST /chat` *(Phase 2)*
+
+Chatbot endpoint. Vector search + Claude Sonnet. Answers questions grounded in consumer_signals data.
 
 ---
 
-## 6. Data Pipeline Design
+## 8. Hosting Stack (verified)
 
-### Sources
-
-| Source | Method | Library | Rate limit strategy |
-|---|---|---|---|
-| Reddit | PRAW (official API) | `praw` | Stay within 60 req/min; scrape one subreddit at a time with delays |
-| Amazon | HTTP scraper | `httpx` + `BeautifulSoup` | Rotate user agents; add delays; use product ASINs. Amazon aggressively blocks scrapers — see Open Question #3 |
-
-### Target Subreddits (launch)
-
-| Condition | Subreddits |
-|---|---|
-| Post-mastectomy | r/breastcancer, r/mastectomy, r/BRCA |
-| Ostomy | r/ostomy, r/CrohnsDisease, r/UlcerativeColitis |
-| Rheumatoid | r/rheumatoid, r/ChronicPain, r/arthritis |
-| Post-surgical | r/PostOpRecovery, r/plasticsurgery |
-
-### Target Amazon Categories (launch)
-- Post-surgery adaptive clothing
-- Front closure garments
-- Ostomy adaptive wear
-- Adaptive clothing (general)
-
-### Pipeline Steps
-
-```
-1. Fetch raw posts/reviews from Reddit + Amazon
-2. Filter for relevance (clothing, dressing, adaptive keywords)
-3. Extract pain points + features via Claude API
-4. Generate embedding (model TBD — see Open Question #2)
-5. Quality gate (minimum text length, relevance score threshold)
-6. Upsert to Supabase — skip duplicates using source_id
-```
-
-### Schedule
-
-| Workflow | Trigger | Purpose |
-|---|---|---|
-| `scraper.yml` | Weekly cron — Sunday 2am UTC + `workflow_dispatch` | Full scrape of all sources |
-| `keepalive.yml` | Every 5 days + `workflow_dispatch` | Insert row into Supabase keepalive table |
-
-**Keep repo public** — GitHub Actions is completely free and unlimited for public repositories.
-
----
-
-## 7. Claude Prompt Design
-
-Claude is used in two places:
-
-**1. During the scrape pipeline (extraction)**
-Claude reads each raw post/review and extracts structured pain points and product features. This runs once per record at ingestion time.
-
-**2. During opportunity generation (synthesis)**
-Claude reads a set of relevant consumer signals and synthesises them into ranked product opportunities and full briefs. This runs either at scrape time (pre-generation) or at query time (on demand) — see Open Question #1.
-
-**Brief structure Claude returns:**
-- Confirmed pain points
-- Recommended product features (categories determined by what the data surfaces)
-- Priority features (what to build first)
-- Gaps (what the data does not yet tell us)
-
-**Scoring logic:**
-
-| Score | Signal strength |
-|---|---|
-| 0–30 | Weak — few mentions, contradictory or thin data |
-| 31–60 | Moderate — some pain points confirmed |
-| 61–80 | Strong — clear pain points, consistent feature signals |
-| 81–100 | Very strong — high volume, consistent, specific |
-
----
-
-## 8. Hosting Stack (verified pricing)
-
-| Layer | Service | Plan | Verified cost |
+| Layer | Service | Plan | Cost |
 |---|---|---|---|
 | Database | Supabase | Free | $0 |
-| Vector search | Supabase pgvector | Included in all plans | $0 |
-| Backend | Render web service | Free (cold starts) → Starter before demos | $0 → $7/mo |
-| Frontend | Render static site | Free, no spin-down, permanent | $0 |
-| Scraper + keepalive | GitHub Actions | Free for public repos | $0 |
-| AI — synthesis | Claude API (`claude-sonnet-4-6`) | Pay per token | ~$1–5/mo |
-| AI — embeddings | TBD | Pay per token | ~$0.50/mo |
-| **Total (development)** | | | **~$1.50–5.50/mo** |
-| **Total (demo-ready)** | | | **~$8.50–12.50/mo** |
+| Vector search | pgvector (built in) | Included | $0 |
+| Backend | Render web service | Free → Starter before demos | $0–$7/mo |
+| Frontend | Render static site | Free | $0 |
+| Scraper + batch job | GitHub Actions | Free (public repo) | $0 |
+| Amazon scraping | Bright Data | Free tier (5k records/mo) | $0 |
+| AI — extraction | Claude Haiku | Pay per token | ~$0.50/mo |
+| AI — synthesis | Claude Opus (TBD) | Pay per token | ~$2–5/mo |
+| AI — embeddings | OpenAI text-embedding-3-small | Pay per token | ~$0.50/mo |
+| AI — chatbot (Phase 2) | Claude Sonnet | Pay per token | ~$1–3/mo |
+| **Total** | | | **~$3–15/mo** |
 
 ---
 
 ## 9. Build Order
 
 ```
-Phase 1 — Foundation
-  Step 1.1  Set up Supabase project + enable pgvector + run schema migrations
-  Step 1.2  Set up GitHub repo (public) + folder structure
-  Step 1.3  Set up environment variable management
+Phase 1 — Foundation ✓ COMPLETE
+  Supabase setup, schema, pgvector
+  GitHub repo + initial docs
+  Initial data load (2,321 records)
 
-Phase 2 — Data Pipeline
-  Step 2.1  Build Reddit scraper (PRAW)
-  Step 2.2  Build Amazon scraper (resolve approach — see Open Question #3)
-  Step 2.3  Build extraction + embedding pipeline (Claude + embedding model TBD)
-  Step 2.4  Load initial dataset — target 200+ verified records
-  Step 2.5  Set up GitHub Actions: scraper.yml + keepalive.yml
-  Step 2.6  Verify data and embeddings in Supabase dashboard
+Phase 2 — Data Pipeline (current)
+  Step 2.1  Update Reddit scraper → hot posts only
+  Step 2.2  Set up Bright Data → live Amazon reviews
+  Step 2.3  Build cleaning pipeline
+  Step 2.4  Build extraction pipeline (Claude Haiku)
+  Step 2.5  Build embedding pipeline
+  Step 2.6  Build weekly synthesis job (Claude Opus — model TBD)
+  Step 2.7  Add clean_text column to consumer_signals
+  Step 2.8  Set up GitHub Actions workflows
+  Step 2.9  Verify full pipeline end to end
 
 Phase 3 — Backend
-  Step 3.1  Set up FastAPI project structure
-  Step 3.2  Build /opportunities endpoint
-  Step 3.3  Build /opportunities/{id}/brief endpoint
-  Step 3.4  Build /health and /conditions endpoints
-  Step 3.5  Test locally with curl or Postman
+  Step 3.1  FastAPI project structure
+  Step 3.2  GET /opportunities endpoint
+  Step 3.3  GET /opportunities/{id} endpoint
+  Step 3.4  GET /conditions + GET /health endpoints
+  Step 3.5  Test locally
   Step 3.6  Deploy to Render
 
 Phase 4 — Frontend
-  Step 4.1  Set up React (Vite) project
-  Step 4.2  Build landing page + condition selector
-  Step 4.3  Build ranked opportunity cards
-  Step 4.4  Build cross-condition overlap flagging
-  Step 4.5  Build full product brief
-  Step 4.6  Build navigation between brief and ranked list
-  Step 4.7  Deploy to Render (static site)
+  Step 4.1  React + Vite setup
+  Step 4.2  Dark PM dashboard layout
+  Step 4.3  Condition selector
+  Step 4.4  Ranked opportunity cards (instant load)
+  Step 4.5  Full product brief (instant load)
+  Step 4.6  Cross-condition overlap flagging
+  Step 4.7  Deploy to Render static site
 
-Phase 5 — Polish + Documentation
-  Step 5.1  Error states + loading states
+Phase 5 — Polish + Phase 2 Features
+  Step 5.1  Error + loading states
   Step 5.2  Mobile responsiveness
-  Step 5.3  Add backend keep-alive before demos
-  Step 5.4  README + living code docs
-  Step 5.5  Full demo run-through
+  Step 5.3  Backend keep-alive before demos
+  Step 5.4  Talk with reports — chatbot + visualisations (Claude Sonnet)
+  Step 5.5  Proactive insight suggestions
+  Step 5.6  Complete remaining docs
 ```
 
 ---
@@ -439,7 +345,7 @@ Phase 5 — Polish + Documentation
 ## 10. Repository Structure
 
 ```
-threadline-app/                         ← public GitHub repo
+threadline-app/
 ├── README.md
 ├── .gitignore
 ├── docs/
@@ -448,7 +354,7 @@ threadline-app/                         ← public GitHub repo
 │   │   ├── user_flow.md
 │   │   └── feature_spec.md
 │   ├── architecture/
-│   │   ├── architecture_spec.md        ← this document
+│   │   ├── architecture_spec.md
 │   │   ├── data_schema.md
 │   │   └── api_reference.md
 │   ├── data/
@@ -462,17 +368,20 @@ threadline-app/                         ← public GitHub repo
 │   └── decisions_log.md
 ├── scraper/
 │   ├── reddit_scraper.py
-│   ├── amazon_scraper.py
-│   ├── extractor.py
+│   ├── amazon_scraper.py (Bright Data)
+│   ├── cleaner.py
+│   ├── extractor.py (Claude Haiku)
 │   ├── embedder.py
+│   ├── synthesiser.py (Claude Opus)
 │   ├── pipeline.py
 │   └── requirements.txt
 ├── backend/
 │   ├── main.py
 │   ├── routes/
 │   │   ├── opportunities.py
+│   │   ├── conditions.py
 │   │   ├── health.py
-│   │   └── conditions.py
+│   │   └── chat.py (Phase 2)
 │   ├── services/
 │   │   ├── supabase_client.py
 │   │   └── claude_client.py
@@ -488,14 +397,15 @@ threadline-app/                         ← public GitHub repo
 │   │   │   ├── OpportunityCard.jsx
 │   │   │   ├── OpportunityList.jsx
 │   │   │   ├── ProductBrief.jsx
-│   │   │   └── EvidencePanel.jsx
+│   │   │   ├── EvidencePanel.jsx
+│   │   │   └── Chatbot.jsx (Phase 2)
 │   │   └── api/
 │   │       └── threadline.js
 │   ├── index.html
 │   └── package.json
 └── .github/
     └── workflows/
-        ├── scraper.yml
+        ├── pipeline.yml (weekly batch job)
         └── keepalive.yml
 ```
 
@@ -505,31 +415,24 @@ threadline-app/                         ← public GitHub repo
 
 | # | Question | Decision needed by |
 |---|---|---|
-| 1 | Are opportunities generated on demand (Claude at query time) or pre-generated at scrape time? | Step 3.2 |
-| 2 | Which embedding model? OpenAI text-embedding-3-small is the working assumption | Step 2.3 |
-| 3 | Amazon scraping approach — direct HTTP or a paid scraping API? Amazon aggressively blocks scrapers | Step 2.2 |
-| 4 | Minimum record count before app produces reliable opportunities? | Step 2.4 |
-| 5 | Backend keep-alive strategy before demos — Uptime Robot or GitHub Actions ping? | Step 5.3 |
-| 6 | Does the brief open as a new page or an expanded panel on the same page? | Step 4.5 |
-| 7 | How many opportunity cards shown by default — all or top N with show more? | Step 4.3 |
-| 8 | Do results load immediately on condition selection or after clicking a button? | Step 4.2 |
-| 9 | What signal volume thresholds define High / Medium / Low confidence? | Step 3.2 |
+| 1 | Confirm Batch API setup for Haiku extraction + Opus synthesis | Step 2.4 |
+| 2 | Which embedding model — OpenAI text-embedding-3-small confirmed? | Step 2.5 |
+| 3 | How many opportunities to pre-generate per condition? (Top 10 is working assumption) | Step 2.6 |
+| 4 | Does brief open as new page or expanded panel? | Step 4.5 |
+| 5 | Backend keep-alive — Uptime Robot or GitHub Actions ping? | Step 5.3 |
 
 ---
 
-## 12. Key Decisions Summary
+## 12. Key Decisions
 
-Full rationale for every decision is in [`decisions_log.md`](../decisions_log.md). Summary:
-
-| Decision | What was decided |
-|---|---|
-| Backend required | FastAPI protects Claude API key from frontend exposure |
-| Hybrid search | Condition filter + vector search gives best signal quality |
-| Weekly scrape | Free on public repos; sufficient freshness for this market |
-| Render for hosting | Predictable cost; free static hosting; no usage surprises |
-| No auth at launch | Reduce scope; DB schema is auth-ready for later |
-| One repo | Simpler to manage at this project size |
-| Supabase keepalive | Insert DB row every 5 days — health endpoint ping does not work |
-| Render cold start | 15-min spin-down; upgrade to Starter ($7/mo) before demos |
-| GitHub Actions inactivity | Scheduled workflows disable after 60 days of repo inactivity |
-| Public repo | Unlimited free Actions minutes on public repos |
+| Decision | What | Rationale |
+|---|---|---|
+| Pre-generate opportunities | Weekly batch, not on-demand | Instant UX, lower cost, scalable |
+| Claude Haiku for extraction | Lightweight model per record | Cheap, fast, sufficient for structured extraction |
+| Claude Opus 4.8 for synthesis | Heavy model weekly via Batch API | Best reasoning; Batch API cuts cost 50% |
+| Hot posts only (Reddit) | Not new or top | Highest signal quality — upvoted by community |
+| Bright Data for Amazon | Paid scraping API | Direct HTTP blocked; Bright Data handles proxies |
+| All data through FastAPI | No direct frontend → Supabase | Protects API keys |
+| Talk with reports | Phase 2 | Build core product first |
+| One repo | threadline-app | Simpler at this project size |
+| Public GitHub repo | Not private | Unlimited free Actions minutes |
