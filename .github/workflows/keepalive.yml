@@ -29,7 +29,7 @@ jobs:
           python3 - << 'EOF'
           from supabase import create_client
           import os
-          from datetime import datetime, timezone
+          from datetime import datetime, timezone, timedelta
 
           supabase = create_client(
               os.environ["SUPABASE_URL"],
@@ -41,11 +41,9 @@ jobs:
               "pinged_at": datetime.now(timezone.utc).isoformat()
           }).execute()
 
-          # Delete old rows (keep table small)
-          supabase.table("keepalive").delete().lt(
-              "pinged_at",
-              "now() - interval '7 days'"
-          ).execute()
+          # Delete rows older than 7 days
+          cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+          supabase.table("keepalive").delete().lt("pinged_at", cutoff).execute()
 
           print(f"Keepalive ping sent at {datetime.now(timezone.utc)}")
           EOF
