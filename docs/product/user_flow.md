@@ -1,8 +1,8 @@
 # Threadline — User Flow
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Status:** Approved for build  
-**Last updated:** July 1, 2026  
+**Last updated:** July 2, 2026  
 
 ---
 
@@ -10,14 +10,23 @@
 
 This document describes the full experience a user has from the moment they open Threadline to the moment they leave with a product idea they are confident in.
 
-The flow has four stages:
+The flow has four stages at launch, with a fifth coming in Phase 2:
 
 ```
 1. Landing       → user understands what Threadline does
 2. Selection     → user picks one or more conditions
-3. Discovery     → user sees ranked product opportunities
-4. Brief         → user clicks into a full product brief
+3. Discovery     → user sees ranked product opportunities instantly
+4. Brief         → user clicks into a full product brief instantly
+5. Chat (Phase 2) → user asks questions and sees visualisations
 ```
+
+---
+
+## How results work — important
+
+All product opportunities and briefs are **pre-generated weekly** by Claude Opus 4.8 and stored in the database. When a user selects a condition, results load instantly from the database — there is no LLM call, no waiting, no spinning.
+
+This is intentional. Generating reports on-demand would make users wait 10–30 seconds. Pre-generation means instant load every time.
 
 ---
 
@@ -27,8 +36,8 @@ The flow has four stages:
 
 A clean page with two elements:
 
-1. A short explanation of what Threadline does — one or two sentences maximum. No marketing fluff. Something honest and direct, for example:
-   > *"Threadline surfaces what adaptive fashion consumers are asking for — so you know what to build before you run a focus group."*
+1. A short explanation of what Threadline does — one or two sentences maximum:
+   > *"Threadline turns consumer frustration into product briefs before a brand runs a focus group."*
 
 2. The condition selector immediately below — visible without scrolling
 
@@ -44,7 +53,7 @@ Reads the explanation, then moves directly to selecting a condition. There is no
 
 **What the user sees:**
 
-Four condition options displayed as selectable cards or buttons:
+Four condition options displayed as selectable cards:
 
 - Post-mastectomy / breast cancer recovery
 - Ostomy
@@ -53,15 +62,13 @@ Four condition options displayed as selectable cards or buttons:
 
 **What the user does:**
 
-Selects one or more conditions. Multiple selections are allowed. There is no limit.
+Selects one or more conditions. Multiple selections are allowed.
 
 **Behaviour:**
 
 - Selected conditions are visually highlighted
 - A "Show opportunities" button appears once at least one condition is selected
-- If multiple conditions are selected, results will include opportunities across all selected conditions, with cross-condition overlap flagged where it exists
-
-**Open question (decide during build):** Whether results load immediately on selection or after the user clicks "Show opportunities." To be decided based on how fast the backend responds in practice.
+- If multiple conditions are selected, results include opportunities across all selected conditions with cross-condition overlap flagged where it exists
 
 ---
 
@@ -69,27 +76,29 @@ Selects one or more conditions. Multiple selections are allowed. There is no lim
 
 **What the user sees:**
 
-A ranked list of product opportunities based on the selected condition(s). Each item in the list is an opportunity card showing:
+A ranked list of pre-generated product opportunities. Results load instantly — no waiting.
 
-- **Product idea title** — a specific, actionable product name (e.g. "Front-closure adaptive bra")
-- **Signal strength score** — a number from 0–100 indicating how strongly real consumer signals support this opportunity
-- **Top pain point summary** — one line describing the primary consumer frustration this product addresses
-- **Conditions** — which condition(s) this opportunity applies to
+Each opportunity card shows:
+
+- **Product idea title** — specific and actionable (e.g. "Front-closure adaptive bra")
+- **Signal strength score** — 0–100
+- **Top pain point summary** — one line
+- **Conditions** — which condition(s) this applies to
 
 Cards are ranked by signal strength, highest first.
 
 **Cross-condition overlap:**
 
-If an opportunity appears across multiple conditions, it is flagged visually (e.g. a badge or tag). This tells the user that the need is broader than one condition — a larger market opportunity.
+Opportunities appearing across multiple conditions are flagged visually. This signals a larger market opportunity — the same need exists across more than one patient group.
 
 **What the user does:**
 
-Browses the ranked list. Clicks any card to open the full product brief for that opportunity.
+Browses the ranked list. Clicks any card to open the full product brief.
 
 **Edge cases:**
 
-- If there is not enough data to generate reliable opportunities for a selected condition, Threadline displays an honest message rather than showing low-quality results
-- If no cross-condition overlap exists, nothing is flagged — overlap is surfaced only when it genuinely exists in the data
+- If there is not enough data to generate reliable opportunities for a selected condition, Threadline shows an honest message rather than low-quality results
+- If no cross-condition overlap exists, nothing is flagged — overlap is only surfaced when it genuinely exists
 
 ---
 
@@ -97,76 +106,88 @@ Browses the ranked list. Clicks any card to open the full product brief for that
 
 **What the user sees:**
 
-A full product brief for the selected opportunity, containing:
+A full pre-generated product brief. Loads instantly from the database.
 
 **Header**
 - Product idea title
-- Signal strength score + confidence level (e.g. High / Medium / Low)
+- Signal strength score + confidence level (High / Medium / Low)
 - Conditions this applies to
 
 **Confirmed pain points**
-- A list of the specific consumer frustrations this product addresses
+- Specific consumer frustrations this product addresses
+- Derived from real Reddit posts and Amazon reviews
 
 **Recommended product features**
-- Specific product features consumers mention consistently in the data — categories will be determined by what the data actually surfaces
+- Specific features consumers mention consistently
+- Categories determined by what the data actually surfaces
 
 **Priority features**
 - What to build first, ranked by signal frequency
 
 **Gaps**
-- What the data does not yet tell us — honest about the limits of current signal volume
+- What the data does not yet tell us — honest about limits
 
 **Source evidence**
-- A sample of the actual Reddit posts and Amazon reviews that drove this brief
-- Each source shows: platform (Reddit or Amazon), a short excerpt, and a link to the original
+- Sample Reddit posts and Amazon reviews that drove this brief
+- Each source: platform, short excerpt, link to original
 
 **What the user does:**
 
-Reads the brief. Uses it to make a product decision. Can navigate back to the ranked list to explore other opportunities.
+Reads the brief. Uses it to make a product decision. Can navigate back to the ranked list.
+
+Cards the user has already read are visually distinct so they can track what they've seen.
+
+---
+
+## Stage 5 — Talk with Reports *(Phase 2)*
+
+After launch, users will be able to ask questions directly about the data and see visualisations.
+
+**Examples:**
+- *"What's the most urgent product to build for ostomy patients?"*
+- *"Do post-mastectomy and post-surgical patients share the same closure needs?"*
+- *"What materials do rheumatoid patients mention most?"*
+
+Claude Sonnet answers using the vector store as context — responses are grounded in real consumer signals, not general knowledge.
+
+Threadline will also proactively surface actionable insights without the user asking.
 
 ---
 
 ## Full Flow Diagram
 
-```
-User opens Threadline
-        ↓
-Landing — brief explanation + condition selector
-        ↓
-User selects one or more conditions
-        ↓
-[TBD: results load immediately OR user clicks "Show opportunities"]
-        ↓
-Ranked opportunity cards load
-  [title + score + pain point + conditions]
-        ↓
-        ├── Cross-condition overlap flagged if it exists
-        │
-        └── User clicks a card
-                ↓
-        Full product brief loads
-          [pain points + features + priority + gaps + evidence]
-                ↓
-        User navigates back to list
-        or leaves with their product idea
+```mermaid
+flowchart TD
+    A[User opens Threadline] --> B[Landing page\nbrief explanation + condition selector]
+    B --> C[User selects one or more conditions]
+    C --> D[User clicks Show opportunities]
+    D --> E[Ranked opportunity cards load instantly\nfrom pre-generated DB]
+    E --> F{Cross-condition overlap?}
+    F -->|Yes| G[Overlap flagged on relevant cards]
+    F -->|No| H[No flag shown]
+    G --> I[User clicks a card]
+    H --> I
+    I --> J[Full product brief loads instantly\nfrom pre-generated DB]
+    J --> K[User reads brief\npain points + features + priority + gaps + evidence]
+    K --> L[User navigates back to list]
+    L --> E
 ```
 
 ---
 
 ## What Threadline Does Not Ask the User to Do
 
-- It does not ask the user to type in a product idea
-- It does not ask the user to create an account (at launch)
-- It does not ask the user to fill in a form
-- It does not make the user wait for a long loading state without feedback
+- Type in a product idea
+- Create an account (at launch)
+- Fill in a form
+- Wait for results to generate
 
 ---
 
-## Open Questions (decide during build)
+## Open Questions
 
 | # | Question | Decision needed by |
 |---|---|---|
-| 1 | Do results load immediately on condition selection, or after clicking "Show opportunities"? | Frontend build — depends on backend response time |
-| 2 | How many opportunity cards are shown by default? All of them, or a top N with a "show more"? | Frontend build |
-| 3 | Can the user change their condition selection without going back to the landing page? | Frontend build |
-| 4 | Does the brief open as a new page or as an expanded panel on the same page? | Frontend build |
+| 1 | How many opportunity cards shown by default — all or top N with show more? | Frontend build |
+| 2 | Does the brief open as a new page or expanded panel? | Frontend build |
+| 3 | Can the user change condition selection without going back to landing? | Frontend build |
