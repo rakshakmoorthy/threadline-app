@@ -1,0 +1,51 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '0 0 */5 * *'  # Every 5 days at midnight UTC
+  workflow_dispatch:         # Manual trigger anytime
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install supabase python-dotenv
+
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python3 - << 'EOF'
+          from supabase import create_client
+          import os
+          from datetime import datetime, timezone
+
+          supabase = create_client(
+              os.environ["SUPABASE_URL"],
+              os.environ["SUPABASE_SERVICE_KEY"]
+          )
+
+          # Insert a row to reset the inactivity timer
+          supabase.table("keepalive").insert({
+              "pinged_at": datetime.now(timezone.utc).isoformat()
+          }).execute()
+
+          # Delete old rows (keep table small)
+          supabase.table("keepalive").delete().lt(
+              "pinged_at",
+              "now() - interval '7 days'"
+          ).execute()
+
+          print(f"Keepalive ping sent at {datetime.now(timezone.utc)}")
+          EOF
