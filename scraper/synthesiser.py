@@ -135,6 +135,7 @@ def synthesise_condition(condition: str) -> list:
         message = client.messages.create(
             model="claude-opus-4-8",
             max_tokens=8000,
+            cache_control={"type": "ephemeral"},  # prompt caching enabled
             messages=[{"role": "user", "content": prompt}]
         )
 
