@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threadline — Market Intelligence for Adaptive Fashion</title>
+<meta name="description" content="Threadline turns consumer frustration from condition-specific communities into product briefs — so brands can enter the adaptive fashion market knowing what to build before they spend a dollar on research.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1a1a2e;
+    --deep-teal:#0D7377;
+    --med-teal:#14BDAC;
+    --light-teal:#F0FAFA;
+    --slate:#5C6B73;
+    --mist:#D8E1E3;
+    --amber:#D9A441;
+    --max:1180px;
+    --focus-ring: 0 0 0 3px rgba(20,189,172,0.55);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--navy); background:var(--light-teal); line-height:1.6;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden; position:relative;
+    font-feature-settings:"tnum" 1;
+  }
+  a{color:inherit; text-decoration:none;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .wrap{max-width:var(--max); margin:0 auto; padding:0 40px; position:relative; z-index:2;}
+  img,svg{display:block; max-width:100%;}
+  button{font-family:inherit; cursor:pointer;}
+  :focus-visible{outline:none; box-shadow:var(--focus-ring); border-radius:4px;}
+
+  /* subtle grain, adds the "premium editorial" texture on every surface */
+  body::before{
+    content:''; position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+
+  .skip-link{position:absolute; left:-999px; top:0; background:var(--navy); color:var(--light-teal); padding:12px 20px; z-index:100; border-radius:0 0 8px 0;}
+  .skip-link:focus{left:0;}
+
+  .scroll-progress{position:fixed; top:0; left:0; height:2px; width:0%; background:var(--med-teal); z-index:80; transition:width .08s linear;}
+
+  .reveal{opacity:0; transform:translateY(28px); transition:opacity .8s var(--ease), transform .8s var(--ease);}
+  .reveal.in{opacity:1; transform:translateY(0);}
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; scroll-behavior:auto !important; animation:none !important;}
+    .reveal{opacity:1 !important; transform:none !important;}
+  }
+
+  .logo{display:flex; align-items:center; gap:10px; font-weight:600; font-size:1.22rem; letter-spacing:-0.01em;}
+  .logo-mark{width:25px; height:25px; flex-shrink:0;}
+  .logo-word{text-transform:lowercase;}
+
+  nav{position:sticky; top:0; z-index:50; background:rgba(26,26,46,0.72); backdrop-filter:blur(16px) saturate(140%); border-bottom:1px solid rgba(216,225,227,0.09);}
+  nav .logo{color:var(--light-teal);}
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; height:80px;}
+  .nav-links{display:flex; gap:40px; align-items:center;}
+  .nav-links a:not(.btn-cta){color:rgba(216,225,227,0.85); font-size:0.92rem; font-weight:500; transition:color .25s var(--ease);}
+  .nav-links a:not(.btn-cta):hover{color:var(--med-teal);}
+  .btn-cta{
+    background:linear-gradient(155deg, #e3b862, var(--amber));
+    color:var(--navy) !important; padding:11px 22px; border-radius:8px; font-weight:600 !important; font-size:0.88rem !important;
+    border:none; display:inline-block; box-shadow:0 1px 0 rgba(255,255,255,0.4) inset, 0 8px 20px -8px rgba(217,164,65,0.5);
+    transition:transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .btn-cta:hover{transform:translateY(-1px); box-shadow:0 1px 0 rgba(255,255,255,0.5) inset, 0 12px 28px -8px rgba(217,164,65,0.65);}
+  .nav-toggle{display:none; background:none; border:none;}
+  .nav-toggle span, .nav-toggle span::before, .nav-toggle span::after{display:block; width:22px; height:2px; background:var(--light-teal); position:relative; transition:.2s;}
+  .nav-toggle span::before, .nav-toggle span::after{content:''; position:absolute;}
+  .nav-toggle span::before{top:-7px;} .nav-toggle span::after{top:7px;}
+
+  /* ---------- HERO ---------- */
+  .hero{position:relative; background:var(--navy); color:var(--light-teal); padding:132px 0 0; overflow:hidden;}
+  .glow{position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:1;}
+  .glow-hero-1{width:640px; height:640px; background:radial-gradient(circle, rgba(20,189,172,0.22), transparent 70%); top:-220px; right:-160px;}
+  .glow-hero-2{width:520px; height:520px; background:radial-gradient(circle, rgba(13,115,119,0.3), transparent 70%); bottom:-280px; left:6%;}
+  .hero-grid{display:grid; grid-template-columns:1.15fr 0.85fr; gap:56px; align-items:center; position:relative; z-index:2;}
+  .hero-copy{max-width:580px;}
+  .ghost-num{position:absolute; top:-46px; left:-14px; font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:11rem; color:rgba(240,250,250,0.035); letter-spacing:-0.04em; z-index:1; pointer-events:none;}
+  .hero h1{font-size:clamp(2.6rem, 5vw, 4.3rem); font-weight:700; letter-spacing:-0.03em; line-height:1.06; margin-bottom:28px;}
+  .hero h1 em{font-style:normal; color:var(--med-teal);}
+  .hero p.lede{font-size:1.15rem; color:rgba(216,225,227,0.88); max-width:48ch; margin-bottom:40px; line-height:1.65;}
+  .btn-primary{
+    background:linear-gradient(155deg, #e3b862, var(--amber)); color:var(--navy);
+    padding:16px 34px; border-radius:9px; font-weight:600; font-size:1rem; display:inline-block; border:none;
+    box-shadow:0 1px 0 rgba(255,255,255,0.45) inset, 0 14px 32px -12px rgba(217,164,65,0.55);
+    transition:transform .25s var(--ease), box-shadow .25s var(--ease); will-change:transform;
+  }
+  .btn-primary:hover{box-shadow:0 1px 0 rgba(255,255,255,0.5) inset, 0 18px 40px -10px rgba(217,164,65,0.7);}
+
+  .signal-graphic{position:relative; height:360px;}
+  .signal-graphic svg{width:100%; height:100%; transition:transform .2s ease-out;}
+  .resolve-path{stroke:var(--med-teal); fill:none; stroke-width:2.6; stroke-linecap:round;}
+  .end-dot{fill:var(--med-teal);}
+  .pulse-ring{fill:none; stroke:var(--med-teal); transform-origin:380px 40px; animation:pulseRing 2.6s ease-out infinite;}
+  .pulse-ring.d2{animation-delay:0.9s;}
+  .scatter-dot{fill:var(--med-teal); animation:twinkle 3.5s ease-in-out infinite;}
+  .signal-label{font-family:'IBM Plex Mono', monospace; font-size:11px; fill:rgba(216,225,227,0.75); letter-spacing:0.06em;}
+  .signal-label.end{fill:var(--med-teal);}
+  @keyframes pulseRing{
+    0%{ stroke-opacity:0.7; stroke-width:2px; transform:scale(1); }
+    100%{ stroke-opacity:0; stroke-width:0.5px; transform:scale(2.6); }
+  }
+  @keyframes twinkle{
+    0%, 100%{ opacity:0.35; } 50%{ opacity:0.9; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pulse-ring{animation:none; opacity:0;}
+    .scatter-dot{animation:none;}
+  }
+
+  .stats-row{display:flex; gap:0; margin-top:64px; border-top:1px solid rgba(216,225,227,0.12); position:relative; z-index:2;}
+  .stat{flex:1; padding:28px 4px 0;}
+  .stat .num{font-family:'IBM Plex Mono', monospace; font-size:2.1rem; font-weight:600; color:var(--med-teal); letter-spacing:-0.02em;}
+  .stat .label{font-size:0.82rem; color:rgba(216,225,227,0.7); margin-top:6px;}
+
+  .wave-divider{line-height:0; position:relative; z-index:3;}
+  .wave-divider svg{width:100%; height:76px; display:block;}
+
+  /* ---------- HOW ---------- */
+  .how{padding:76px 0 130px; position:relative; background:var(--light-teal);}
+  .how-track{position:relative; margin-top:48px;}
+  .how-line{position:absolute; top:5px; left:9%; right:9%; height:10px; z-index:0; pointer-events:none;}
+  .how-line svg{width:100%; height:10px; overflow:visible;}
+  .how-line path{stroke:var(--med-teal); stroke-width:1.4; fill:none; opacity:0.55; stroke-dasharray:1000; stroke-dashoffset:1000; transition:stroke-dashoffset 1.5s var(--ease);}
+  .how-line.in path{stroke-dashoffset:0;}
+  .how-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:32px; position:relative; z-index:1;}
+  .how-step{position:relative; background:var(--light-teal);}
+  .how-step .step-num{font-family:'IBM Plex Mono', monospace; font-size:0.78rem; color:var(--med-teal); margin-bottom:14px; display:flex; align-items:center; gap:10px; letter-spacing:0.02em;}
+  .how-step .step-num::before{content:''; width:11px; height:11px; border-radius:50%; background:var(--med-teal); display:inline-block; box-shadow:0 0 0 4px rgba(20,189,172,0.15);}
+  .how-step h3{font-size:1.15rem; font-weight:600; margin-bottom:10px; color:var(--navy); letter-spacing:-0.01em;}
+  .how-step p{font-size:0.95rem; color:var(--slate); max-width:34ch; line-height:1.65;}
+
+  /* ---------- PRODUCTS ---------- */
+  .products{padding:20px 0 130px; background:var(--light-teal); position:relative;}
+  .section-head{max-width:660px; margin-bottom:52px;}
+  .eyebrow{font-family:'IBM Plex Mono', monospace; font-size:0.76rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--deep-teal); margin-bottom:16px;}
+  .section-head h2{font-size:clamp(1.8rem, 3.2vw, 2.5rem); font-weight:700; letter-spacing:-0.025em; margin-bottom:16px; color:var(--navy); line-height:1.15;}
+  .section-head p{color:var(--slate); font-size:1.05rem; line-height:1.65;}
+
+  .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:40px;}
+  .filter-pill{background:#fff; border:1px solid rgba(13,115,119,0.14); color:var(--slate); padding:10px 20px; border-radius:22px; font-size:0.87rem; font-weight:500; transition:all .25s var(--ease); box-shadow:0 1px 2px rgba(13,115,119,0.04);}
+  .filter-pill:hover{border-color:var(--med-teal); color:var(--deep-teal); transform:translateY(-1px); box-shadow:0 6px 16px -8px rgba(13,115,119,0.25);}
+  .filter-pill[aria-pressed="true"]{background:var(--navy); border-color:var(--navy); color:var(--light-teal); box-shadow:0 8px 20px -8px rgba(26,26,46,0.4);}
+
+  .bento{display:grid; grid-template-columns:repeat(4, 1fr); grid-auto-rows:1fr; gap:22px; transition:opacity .3s var(--ease);}
+  .bento.fading{opacity:0;}
+  .opp-card{
+    background:linear-gradient(160deg, #ffffff, #fbfeff);
+    border:1px solid rgba(13,115,119,0.1); border-radius:16px; padding:30px; position:relative; overflow:hidden;
+    box-shadow:0 2px 8px -4px rgba(13,115,119,0.08);
+    transition:border-color .3s var(--ease), box-shadow .35s var(--ease), transform .35s var(--ease);
+  }
+  .opp-card::before{content:''; position:absolute; top:0; left:0; height:3px; width:0; background:linear-gradient(90deg, var(--med-teal), var(--deep-teal)); transition:width .4s var(--ease);}
+  .opp-card:hover{border-color:rgba(20,189,172,0.35); box-shadow:0 28px 56px -24px rgba(13,115,119,0.35);}
+  .opp-card:hover::before{width:100%;}
+  .opp-card.featured{grid-column:span 2; grid-row:span 2; background:linear-gradient(160deg, #20203d, var(--navy)); color:var(--light-teal); display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 8px 24px -12px rgba(0,0,0,0.4);}
+  .opp-card.featured:hover{box-shadow:0 32px 64px -20px rgba(0,0,0,0.55);}
+  .opp-card.featured h3{color:#fff; font-size:1.4rem; letter-spacing:-0.015em;}
+  .opp-card.featured p{color:rgba(216,225,227,0.85);}
+  .opp-card:not(.featured){grid-column:span 2;}
+  .card-grid-wrap{position:relative; min-height:360px;}
+
+  .gauge-wrap{display:flex; align-items:center; gap:16px; margin-bottom:20px;}
+  .gauge{width:58px; height:58px; flex-shrink:0;}
+  .gauge circle{fill:none; stroke-width:5;}
+  .gauge .track{stroke:rgba(20,189,172,0.16);}
+  .gauge .fill{stroke:var(--med-teal); stroke-linecap:round; transform:rotate(-90deg); transform-origin:center; transition:stroke-dashoffset 1.2s var(--ease);}
+  .gauge-score{font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:0.92rem;}
+
+  .score-badge{font-family:'IBM Plex Mono', monospace; font-size:0.78rem; font-weight:600; color:var(--deep-teal); background:rgba(13,115,119,0.07); padding:5px 12px; border-radius:7px; display:inline-block; margin-bottom:16px;}
+  .opp-card h3{font-size:1.05rem; font-weight:600; margin-bottom:10px; color:var(--navy); letter-spacing:-0.012em; line-height:1.3;}
+  .opp-card p{color:var(--slate); font-size:0.9rem; line-height:1.6;}
+
+  /* ---------- ABOUT ---------- */
+  .about{padding:130px 0; background:#fff; position:relative; border-top:1px solid rgba(13,115,119,0.08); border-bottom:1px solid rgba(13,115,119,0.08);}
+  .mission-vision{display:grid; grid-template-columns:1.3fr 0.9fr; gap:24px; margin-bottom:64px; align-items:stretch;}
+  .mv-card{border:1px solid rgba(13,115,119,0.1); border-radius:14px; padding:32px; transition:transform .35s var(--ease), box-shadow .35s var(--ease);}
+  .mv-card:hover{transform:translateY(-4px); box-shadow:0 24px 48px -24px rgba(13,115,119,0.3);}
+  .mv-card.mission{background:linear-gradient(160deg, var(--light-teal), #e8f7f6); padding-top:40px;}
+  .mv-card h3{font-family:'IBM Plex Mono', monospace; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--deep-teal); margin-bottom:12px;}
+  .mv-card p{color:var(--navy); font-size:1rem; line-height:1.65;}
+  .mv-card.mission p{font-size:1.15rem; max-width:34ch; font-weight:500;}
+
+  .values-track{position:relative; margin-bottom:64px; padding:36px 0;}
+  .values-line{position:absolute; top:50%; left:0; right:0; height:1px;}
+  .values-line svg{width:100%; height:2px;}
+  .values-row{display:flex; justify-content:space-between; position:relative; flex-wrap:wrap; gap:18px;}
+  .value-chip{display:flex; align-items:center; gap:9px; background:#fff; border:1px solid rgba(13,115,119,0.12); border-radius:24px; padding:12px 18px; font-size:0.85rem; font-weight:500; color:var(--navy); position:relative; z-index:2; box-shadow:0 2px 6px -3px rgba(13,115,119,0.1); transition:transform .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease);}
+  .value-chip:hover{border-color:var(--med-teal); box-shadow:0 12px 24px -10px rgba(13,115,119,0.3);}
+  .value-chip:nth-child(odd){transform:translateY(-10px);}
+  .value-chip:nth-child(even){transform:translateY(10px);}
+  .value-chip:hover:nth-child(odd){transform:translateY(-14px) scale(1.03);}
+  .value-chip:hover:nth-child(even){transform:translateY(6px) scale(1.03);}
+  .value-chip svg{width:14px; height:14px; stroke:var(--med-teal); flex-shrink:0;}
+
+  .compare-box{background:linear-gradient(165deg, #20203d, var(--navy)); color:var(--light-teal); border-radius:20px; padding:48px; display:grid; grid-template-columns:1.1fr 0.9fr; gap:40px; align-items:center; position:relative; overflow:hidden; box-shadow:0 24px 64px -24px rgba(0,0,0,0.4);}
+  .compare-box::after{content:''; position:absolute; top:0; right:0; width:2px; height:100%; background:linear-gradient(var(--med-teal), transparent);}
+  .compare-box h3{font-size:1.35rem; font-weight:700; margin-bottom:14px; letter-spacing:-0.015em; line-height:1.25;}
+  .compare-box p{color:rgba(216,225,227,0.85); font-size:0.96rem; line-height:1.65;}
+  .compare-list{display:grid; gap:11px;}
+  .compare-row{display:flex; justify-content:space-between; padding:14px 18px; border-radius:10px; background:rgba(240,250,250,0.04); border:1px solid rgba(216,225,227,0.1); font-size:0.9rem; transition:transform .3s var(--ease), background .3s var(--ease);}
+  .compare-row:hover{transform:translateX(5px); background:rgba(240,250,250,0.06);}
+  .compare-row.us{background:rgba(20,189,172,0.15); border-color:rgba(20,189,172,0.4);}
+  .compare-row .role{font-family:'IBM Plex Mono', monospace; font-size:0.74rem; color:var(--med-teal);}
+
+  .testimonial{padding:96px 0; background:var(--light-teal); text-align:center; position:relative;}
+  .testimonial blockquote{max-width:660px; margin:0 auto; font-size:1.35rem; color:var(--navy); font-style:italic; line-height:1.6; position:relative; font-weight:500; letter-spacing:-0.01em;}
+  .testimonial cite{display:block; margin-top:22px; font-style:normal; font-size:0.85rem; color:var(--slate);}
+
+  /* ---------- CONTACT ---------- */
+  .contact{padding:130px 0 140px; background:linear-gradient(165deg, var(--deep-teal), #0a5a5c); color:var(--light-teal); position:relative; overflow:hidden;}
+  .glow-contact{width:500px; height:500px; background:radial-gradient(circle, rgba(20,189,172,0.32), transparent 70%); top:-200px; right:-100px;}
+  .contact .section-head p{color:rgba(216,225,227,0.85);}
+  .contact .eyebrow{color:var(--med-teal);}
+  .contact .section-head h2{color:#fff;}
+  .contact-grid{display:grid; grid-template-columns:0.9fr 1.1fr; gap:56px; align-items:start; position:relative; z-index:2;}
+  .form-group{margin-bottom:20px;}
+  .form-row{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  label{display:block; font-size:0.85rem; font-weight:500; margin-bottom:8px; color:var(--light-teal);}
+  input, textarea{width:100%; padding:13px 16px; border-radius:8px; border:1px solid rgba(240,250,250,0.25); background:rgba(240,250,250,0.07); color:#fff; font-family:inherit; font-size:0.94rem; transition:border-color .25s var(--ease), background .25s var(--ease);}
+  input:focus, textarea:focus{background:rgba(240,250,250,0.11); border-color:var(--med-teal);}
+  input::placeholder, textarea::placeholder{color:rgba(240,250,250,0.4);}
+  input:invalid[data-touched="true"], textarea:invalid[data-touched="true"]{border-color:#e88;}
+  .error-msg{font-size:0.78rem; color:#ffb4b4; margin-top:5px; display:none;}
+  .error-msg.show{display:block;}
+  textarea{resize:vertical; min-height:104px;}
+  .social{display:flex; gap:16px; margin-top:24px;}
+  .social a{width:40px; height:40px; border-radius:50%; border:1px solid rgba(240,250,250,0.25); display:flex; align-items:center; justify-content:center; transition:border-color .3s var(--ease), transform .3s var(--ease);}
+  .social a:hover{border-color:var(--med-teal); transform:translateY(-3px);}
+  .social svg{width:17px; height:17px; stroke:var(--light-teal);}
+  .form-status{font-size:0.85rem; margin-top:16px; color:var(--med-teal); display:none;}
+  .form-status.show{display:block;}
+
+  footer{padding:44px 0; background:var(--navy); position:relative;}
+  footer .wrap{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;}
+  footer .logo{color:var(--light-teal); font-size:1rem;}
+  footer .foot-links{display:flex; gap:26px;}
+  footer .foot-links a{color:rgba(216,225,227,0.7); font-size:0.83rem; transition:color .25s var(--ease);}
+  footer .foot-links a:hover{color:var(--med-teal);}
+
+  @media (max-width: 900px){
+    .hero-grid{grid-template-columns:1fr;}
+    .signal-graphic{height:230px;}
+    .how-grid, .card-grid, .mission-vision, .compare-box, .contact-grid, .form-row{grid-template-columns:1fr;}
+    .bento{grid-template-columns:1fr;}
+    .opp-card.featured, .opp-card:not(.featured){grid-column:span 1; grid-row:span 1;}
+    .value-chip, .value-chip:hover{transform:none !important;}
+    .how-line{display:none;}
+    .stats-row{flex-wrap:wrap;}
+    .stat{flex:1 1 50%; padding-bottom:20px;}
+    .nav-links{position:absolute; top:80px; left:0; right:0; background:var(--navy); flex-direction:column; align-items:flex-start; padding:20px 40px 28px; gap:18px; display:none; border-bottom:1px solid rgba(216,225,227,0.15);}
+    .nav-links.open{display:flex;}
+    .nav-toggle{display:block;}
+    .glow{display:none;}
+    .hero, .how, .products, .about, .contact{padding-top:80px; padding-bottom:80px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<nav aria-label="Primary">
+  <div class="wrap">
+    <a href="#top" class="logo" aria-label="Threadline home">
+      <svg class="logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M5 26 Q15 27 26 8" stroke="#14BDAC" stroke-width="2" stroke-linecap="round" stroke-dasharray="1.5 4"/>
+        <circle cx="26" cy="8" r="2.6" fill="#14BDAC"/>
+      </svg>
+      <span class="logo-word">threadline</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#products">Product</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+      <a href="#contact" class="btn-cta">Request pilot access</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+  </div>
+</nav>
+
+<main id="main">
+  <header class="hero" id="top">
+    <div class="glow glow-hero-1" aria-hidden="true"></div>
+    <div class="glow glow-hero-2" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="ghost-num" aria-hidden="true">01</div>
+          <h1>Threadline turns consumer frustration into <em>product briefs</em></h1>
+          <p class="lede">AI-driven market intelligence for adaptive fashion brand teams — know what to build before you spend a dollar on research.</p>
+          <a href="#contact" class="btn-primary" id="heroCta">Request pilot access</a>
+        </div>
+        <div class="signal-graphic" id="signalGraphic" aria-hidden="true">
+          <svg viewBox="0 0 400 340" fill="none" id="signalSvg">
+            <circle class="scatter-dot" cx="18" cy="304" r="3" style="animation-delay:0s"/>
+            <circle class="scatter-dot" cx="42" cy="278" r="2.5" style="animation-delay:.3s"/>
+            <circle class="scatter-dot" cx="14" cy="256" r="2" style="animation-delay:.6s"/>
+            <circle class="scatter-dot" cx="52" cy="240" r="3" style="animation-delay:.2s"/>
+            <circle class="scatter-dot" cx="30" cy="222" r="2.5" style="animation-delay:.8s"/>
+            <circle class="scatter-dot" cx="64" cy="210" r="2" style="animation-delay:.5s"/>
+            <circle class="scatter-dot" cx="20" cy="196" r="3" style="animation-delay:1.1s"/>
+            <circle class="scatter-dot" cx="48" cy="184" r="2" style="animation-delay:.15s"/>
+            <circle class="scatter-dot" cx="8" cy="230" r="2" style="animation-delay:.9s"/>
+            <circle class="scatter-dot" cx="36" cy="260" r="2" style="animation-delay:.45s"/>
+            <path id="resolvePath" class="resolve-path" d="M20 300 Q120 200 380 40"/>
+            <g class="pulse-ring"><circle cx="380" cy="40" r="8"/></g>
+            <g class="pulse-ring d2"><circle cx="380" cy="40" r="8"/></g>
+            <circle class="end-dot" cx="380" cy="40" r="6"/>
+            <text class="signal-label" x="8" y="332">SCATTERED SIGNAL</text>
+            <text class="signal-label end" x="392" y="30" text-anchor="end">ONE RANKED OPPORTUNITY</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="num" data-count="2353">0</div><div class="label">consumer signals analyzed</div></div>
+        <div class="stat"><div class="num" data-count="20">0</div><div class="label">opportunities pre-generated</div></div>
+        <div class="stat"><div class="num" data-count="4">0</div><div class="label">conditions mapped</div></div>
+      </div>
+    </div>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 76" preserveAspectRatio="none"><path d="M0,38 C480,4 960,4 1440,38 L1440,76 L0,76 Z" fill="#F0FAFA"/></svg>
+    </div>
+  </header>
+
+  <section class="how reveal">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">How it works</div>
+        <h2>Three steps, no guesswork</h2>
+      </div>
+      <div class="how-track">
+        <div class="how-line" id="howLine">
+          <svg viewBox="0 0 1000 10" preserveAspectRatio="none"><path d="M0 5 Q250 1 500 5 T1000 5"/></svg>
+        </div>
+        <div class="how-grid">
+          <div class="how-step"><div class="step-num">01</div><h3>Select conditions</h3><p>Choose from post-mastectomy, ostomy, rheumatoid arthritis, or post-surgical recovery.</p></div>
+          <div class="how-step"><div class="step-num">02</div><h3>Ranked opportunities</h3><p>See pre-generated opportunities scored by real consumer signal, highest first.</p></div>
+          <div class="how-step"><div class="step-num">03</div><h3>Product brief</h3><p>Click into any opportunity for the full evidence-backed brief your team can act on.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="products" id="products" aria-labelledby="products-heading">
+    <div class="wrap reveal">
+      <div class="section-head">
+        <div class="eyebrow">Opportunity catalog</div>
+        <h2 id="products-heading">Ranked by condition, backed by real signal</h2>
+        <p>Every opportunity is scored against how often it recurs across consumer communities — filter by condition to see the current ranking.</p>
+      </div>
+      <div class="filters" role="group" aria-label="Filter opportunities by condition" id="filters"></div>
+      <div class="card-grid-wrap">
+        <div class="bento" id="cardGrid" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="testimonial reveal">
+    <div class="wrap">
+      <blockquote>
+        "This is a placeholder for a brief, professional testimonial about how much faster Threadline made our opportunity assessment."
+        <cite>— Placeholder, Head of Product</cite>
+      </blockquote>
+    </div>
+  </section>
+
+  <section class="about" id="about" aria-labelledby="about-heading">
+    <div class="wrap reveal">
+      <div class="section-head">
+        <div class="eyebrow">Why Threadline exists</div>
+        <h2 id="about-heading">An intelligence company, not a product company</h2>
+      </div>
+
+      <div class="mission-vision">
+        <div class="mv-card mission">
+          <h3>Mission</h3>
+          <p>Give adaptive fashion brand teams evidence-backed direction, so product decisions start from real consumer signal instead of assumption.</p>
+        </div>
+        <div class="mv-card">
+          <h3>Vision</h3>
+          <p>Become the intelligence layer every adaptive fashion brand checks before committing budget to a new line.</p>
+        </div>
+      </div>
+
+      <div class="values-track">
+        <div class="values-line" aria-hidden="true"><svg viewBox="0 0 1000 2" preserveAspectRatio="none"><line x1="0" y1="1" x2="1000" y2="1" stroke="#D8E1E3" stroke-width="1" stroke-dasharray="4 4"/></svg></div>
+        <div class="values-row">
+          <div class="value-chip"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Consumer truth over assumption</div>
+          <div class="value-chip"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Precision over volume</div>
+          <div class="value-chip"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Accessibility</div>
+          <div class="value-chip"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Transparency</div>
+          <div class="value-chip"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Speed to insight</div>
+        </div>
+      </div>
+
+      <div class="compare-box">
+        <div>
+          <h3>Intelligence layer, not another garment line</h3>
+          <p>Threadline operates at the intersection of data science and structural design. While brands like Tommy Hilfiger Adaptive and Silverts focus on manufacturing the garments, we focus on the evidence layer underneath — validated consumer truth, not manufacturing convenience, driving what gets built.</p>
+        </div>
+        <div class="compare-list">
+          <div class="compare-row us"><span>Threadline</span><span class="role">market intelligence</span></div>
+          <div class="compare-row"><span>Tommy Hilfiger Adaptive</span><span class="role">product line</span></div>
+          <div class="compare-row"><span>Silverts</span><span class="role">product line</span></div>
+          <div class="compare-row"><span>Reboundwear</span><span class="role">product line</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 76" preserveAspectRatio="none"><path d="M0,38 C480,4 960,4 1440,38 L1440,76 L0,76 Z" fill="#0D7377"/></svg>
+    </div>
+  </section>
+
+  <section class="contact" id="contact" aria-labelledby="contact-heading">
+    <div class="glow glow-contact" aria-hidden="true"></div>
+    <div class="wrap contact-grid">
+      <div>
+        <div class="section-head" style="margin-bottom:0;">
+          <div class="eyebrow">Get started</div>
+          <h2 id="contact-heading">Request pilot access</h2>
+          <p>Provide your details to join the early access program and start with one condition, free.</p>
+        </div>
+        <div class="social" aria-label="Social links">
+          <a href="https://www.linkedin.com/in/rakshakmoorthy22/?skipRedirect=true" aria-label="Threadline on LinkedIn" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke-width="1.6"/><path d="M8 11v5M8 8v.01M12 16v-3a2 2 0 0 1 4 0v3" stroke-width="1.6" stroke-linecap="round"/></svg></a>
+          <a href="https://github.com/rakshakmoorthy/threadline-app" aria-label="Threadline on GitHub" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2-.2 4.5-1 4.5-4.5 0-1-.4-1.8-1-2.5.1-.3.4-1.3-.1-2.6 0 0-.8-.3-2.7 1a9.4 9.4 0 0 0-5 0c-1.9-1.3-2.7-1-2.7-1-.5 1.3-.2 2.3-.1 2.6-.6.7-1 1.5-1 2.5 0 3.5 2.5 4.3 4.5 4.5-.3.3-.5.7-.6 1.2-.5.2-1.8.6-2.6-.7" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </div>
+
+      <form id="pilotForm" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required aria-required="true" placeholder="Your name">
+            <div class="error-msg" id="nameError">Please enter your name.</div>
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required aria-required="true" placeholder="you@company.com">
+            <div class="error-msg" id="emailError">Please enter a valid email.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="company">Company</label>
+          <input type="text" id="company" name="company" placeholder="Brand or company name">
+        </div>
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" placeholder="Which condition are you exploring first?"></textarea>
+        </div>
+        <button type="submit" class="btn-primary" id="submitBtn" style="border:none;">Request pilot access</button>
+        <div class="form-status" id="formStatus" role="status">Thanks — we'll be in touch shortly.</div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a href="#top" class="logo">
+      <svg class="logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true" width="20" height="20">
+        <path d="M5 26 Q15 27 26 8" stroke="#14BDAC" stroke-width="2" stroke-linecap="round" stroke-dasharray="1.5 4"/>
+        <circle cx="26" cy="8" r="2.6" fill="#14BDAC"/>
+      </svg>
+      <span class="logo-word">threadline</span>
+    </a>
+    <div class="foot-links">
+      <a href="#products">Product</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const hasHover = window.matchMedia('(hover: hover)').matches;
+
+  const toggle = document.getElementById('navToggle');
+  const links = document.getElementById('navLinks');
+  toggle.addEventListener('click', () => {
+    const open = links.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open);
+  });
+  links.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    links.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false');
+  }));
+
+  const progressBar = document.getElementById('scrollProgress');
+  function updateProgress(){
+    const h = document.documentElement;
+    const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+    progressBar.style.width = scrolled + '%';
+  }
+  window.addEventListener('scroll', updateProgress, {passive:true});
+  updateProgress();
+
+  const resolvePath = document.getElementById('resolvePath');
+  const len = resolvePath.getTotalLength();
+  resolvePath.style.strokeDasharray = len;
+  resolvePath.style.strokeDashoffset = len;
+  requestAnimationFrame(() => {
+    resolvePath.style.transition = 'stroke-dashoffset 1.7s var(--ease, ease)';
+    resolvePath.style.strokeDashoffset = 0;
+  });
+
+  if(hasHover && !reduceMotion){
+    const signalGraphic = document.getElementById('signalGraphic');
+    const signalSvg = document.getElementById('signalSvg');
+    signalGraphic.addEventListener('mousemove', (e) => {
+      const rect = signalGraphic.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      signalSvg.style.transform = `translate(${x * 14}px, ${y * 14}px)`;
+    });
+    signalGraphic.addEventListener('mouseleave', () => { signalSvg.style.transform = 'translate(0,0)'; });
+  }
+
+  if(hasHover && !reduceMotion){
+    document.querySelectorAll('.btn-primary, .btn-cta').forEach(btn => {
+      btn.addEventListener('mousemove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = (e.clientX - rect.left - rect.width/2) * 0.2;
+        const y = (e.clientY - rect.top - rect.height/2) * 0.28;
+        btn.style.transform = `translate(${x}px, ${y}px)`;
+      });
+      btn.addEventListener('mouseleave', () => { btn.style.transform = 'translate(0,0)'; });
+    });
+  }
+
+  const revealEls = document.querySelectorAll('.reveal');
+  const howLine = document.getElementById('howLine');
+  const statNums = document.querySelectorAll('.stat .num');
+  let statsAnimated = false;
+
+  function animateCount(el){
+    const target = parseInt(el.dataset.count, 10);
+    const start = performance.now();
+    const dur = 1300;
+    function tick(now){
+      const p = Math.min((now - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased).toLocaleString();
+      if(p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if(entry.isIntersecting){
+        entry.target.classList.add('in');
+        if(entry.target === howLine){ howLine.classList.add('in'); }
+        if(entry.target.classList.contains('stats-row') && !statsAnimated){
+          statsAnimated = true;
+          statNums.forEach(animateCount);
+        }
+        io.unobserve(entry.target);
+      }
+    });
+  }, {threshold:0.25});
+
+  revealEls.forEach(el => io.observe(el));
+  io.observe(howLine);
+  const statsRow = document.querySelector('.stats-row');
+  io.observe(statsRow);
+
+  const opportunities = {
+    "Post-mastectomy": [
+      {title:"Seam placement for drain access", desc:"Recurring frustration across multiple recovery communities about seams that interfere with drain tubing.", score:9.4},
+      {title:"Front-closure bra alternatives", desc:"Limited options above size 38 for post-surgical front closures that don't compress the chest wall.", score:8.9},
+      {title:"Compression-friendly outerwear", desc:"Seasonal gap in jackets that layer over compression garments without added bulk.", score:8.7},
+      {title:"Discreet prosthesis pockets", desc:"Requests for pocket placement that doesn't shift during daily movement.", score:8.2},
+      {title:"Soft-seam sleepwear", desc:"Overnight comfort requests citing seam irritation on the surgical side.", score:7.9}
+    ],
+    "Ostomy": [
+      {title:"Low-pressure waistbands", desc:"Waistband designs that avoid pressure directly over the stoma site.", score:9.1},
+      {title:"Discreet pouch access points", desc:"Zippers or panels enabling quick, private appliance checks.", score:8.8},
+      {title:"Fabric behavior near appliances", desc:"Requests for fabrics that don't cling or crinkle audibly near the pouch.", score:8.3},
+      {title:"Swimwear with concealed access", desc:"A recurring gap in swimwear that hides the appliance without extra layers.", score:7.9},
+      {title:"High-rise adjustable waist systems", desc:"Adjustable waist mechanisms for post-surgical swelling fluctuation.", score:7.5}
+    ],
+    "Rheumatoid arthritis": [
+      {title:"Grip-free closures", desc:"Magnetic or velcro fastenings replacing buttons that are difficult on flare days.", score:9.0},
+      {title:"One-handed dressing systems", desc:"Garments designed to be worn independently during limited-mobility periods.", score:8.6},
+      {title:"Joint-friendly footwear closures", desc:"Requests for shoe fastenings that avoid fine motor strain.", score:8.1},
+      {title:"Weighted-seam outerwear", desc:"Lighter fabric weights that reduce shoulder joint strain.", score:7.7},
+      {title:"Adaptive glove-friendly cuffs", desc:"Sleeve cuffs that accommodate compression gloves without bunching.", score:7.3}
+    ],
+    "Post-surgical recovery": [
+      {title:"Limited-mobility dressing sets", desc:"Coordinated separates designed for short-term post-op wear.", score:8.8},
+      {title:"One-handed adjustable fastenings", desc:"Requests for garments that can be adjusted with one hand during recovery.", score:8.4},
+      {title:"Short-term rental or trial wear", desc:"Interest in short-term wear options for temporary recovery needs.", score:7.8},
+      {title:"Wound-safe waistbands", desc:"Waistband placement that avoids pressure on common incision sites.", score:7.6},
+      {title:"Compression-integrated basics", desc:"Everyday basics with built-in light compression for swelling management.", score:7.2}
+    ]
+  };
+
+  const filtersEl = document.getElementById('filters');
+  const gridEl = document.getElementById('cardGrid');
+  const conditions = Object.keys(opportunities);
+  let active = conditions[0];
+
+  function renderFilters(){
+    filtersEl.innerHTML = conditions.map(c =>
+      `<button class="filter-pill" aria-pressed="${c === active}" data-condition="${c}">${c}</button>`
+    ).join('');
+    filtersEl.querySelectorAll('.filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(btn.dataset.condition === active) return;
+        active = btn.dataset.condition;
+        renderFilters();
+        if(reduceMotion){ renderGrid(); return; }
+        gridEl.classList.add('fading');
+        setTimeout(() => { renderGrid(); gridEl.classList.remove('fading'); }, 250);
+      });
+    });
+  }
+
+  function gaugeSvg(score, id){
+    const pct = score / 10;
+    const r = 24, circ = 2 * Math.PI * r;
+    return `<svg class="gauge" viewBox="0 0 60 60">
+      <circle class="track" cx="30" cy="30" r="${r}"/>
+      <circle class="fill" id="${id}" cx="30" cy="30" r="${r}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"/>
+    </svg>`;
+  }
+
+  function attachCardTilt(){
+    if(!hasHover || reduceMotion) return;
+    document.querySelectorAll('.opp-card').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width - 0.5;
+        const y = (e.clientY - rect.top) / rect.height - 0.5;
+        const rx = (-y * 5).toFixed(2);
+        const ry = (x * 5).toFixed(2);
+        card.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px)`;
+      });
+      card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+    });
+  }
+
+  function renderGrid(){
+    const items = opportunities[active];
+    gridEl.innerHTML = items.map((o, i) => {
+      if(i === 0){
+        const gid = 'gauge-featured';
+        return `<article class="opp-card featured">
+          <div>
+            <div class="gauge-wrap">
+              ${gaugeSvg(o.score, gid)}
+              <span class="gauge-score">${o.score}/10</span>
+            </div>
+            <h3>${o.title}</h3>
+            <p>${o.desc}</p>
+          </div>
+        </article>`;
+      }
+      return `<article class="opp-card">
+        <span class="score-badge">score: ${o.score}</span>
+        <h3>${o.title}</h3>
+        <p>${o.desc}</p>
+      </article>`;
+    }).join('');
+
+    requestAnimationFrame(() => {
+      const fillEl = document.getElementById('gauge-featured');
+      if(fillEl){
+        const circ = 2 * Math.PI * 24;
+        const pct = items[0].score / 10;
+        requestAnimationFrame(() => { fillEl.style.strokeDashoffset = circ - (pct * circ); });
+      }
+    });
+    attachCardTilt();
+  }
+
+  renderFilters();
+  renderGrid();
+
+  const form = document.getElementById('pilotForm');
+  const nameInput = document.getElementById('name');
+  const emailInput = document.getElementById('email');
+  const nameError = document.getElementById('nameError');
+  const emailError = document.getElementById('emailError');
+  const status = document.getElementById('formStatus');
+
+  function validateField(input, errorEl){
+    input.dataset.touched = "true";
+    const valid = input.checkValidity();
+    errorEl.classList.toggle('show', !valid);
+    return valid;
+  }
+  nameInput.addEventListener('blur', () => validateField(nameInput, nameError));
+  emailInput.addEventListener('blur', () => validateField(emailInput, emailError));
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nameOk = validateField(nameInput, nameError);
+    const emailOk = validateField(emailInput, emailError);
+    if(nameOk && emailOk){
+      status.classList.add('show');
+      form.reset();
+    }
+  });
+</script>
+
+</body>
+</html>
